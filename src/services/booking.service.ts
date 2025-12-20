@@ -367,12 +367,17 @@ export const BookingService = {
       });
 
       if (!booking) throw new Error("BOOKING_NOT_FOUND");
-      if (booking.status !== "DRAFT") throw new Error("CANNOT_SUBMIT");
+      if (!["DRAFT", "REJECTED"].includes(booking.status)) {
+        throw new Error("CANNOT_SUBMIT");
+      }
 
       const updated = await tx.booking.update({
         where: { id: bookingId },
         data: {
           status: "PENDING",
+          rejectionReason: null,
+          rejectionResolution: null,
+          isResolved: false,
         },
       });
 
