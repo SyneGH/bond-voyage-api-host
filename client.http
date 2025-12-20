@@ -133,7 +133,14 @@ Authorization: Bearer {{userToken}}
 ### Weather: Lookup (requires OPENWEATHER_API_KEY)
 GET http://localhost:8087/api/v1/weather?lat=14.5995&lng=120.9842
 
-### Route Optimization: requires GOOGLE_MAPS_API_KEY
+### Weather: Forecast (returns mock if OPENWEATHER_API_KEY missing)
+GET http://localhost:8087/api/v1/weather/forecast?lat=14.5995&lng=120.9842
+
+### Bookings: Submit (user, allows resubmitting rejected)
+POST http://localhost:8087/api/v1/bookings/{{bookingId}}/submit
+Authorization: Bearer {{userToken}}
+
+### Route Optimization: uses GEOAPIFY_API_KEY or fallback
 POST http://localhost:8087/api/v1/routes/optimize
 Content-Type: application/json
 
@@ -172,16 +179,6 @@ Content-Type: application/json
   "proofImageBase64": "aGVsbG8=",
   "proofMimeType": "image/png",
   "transactionId": "TXN-10001"
-}
-
-### Route Optimization: requires GEOAPIFY_API_KEY
-POST http://localhost:8087/api/v1/routes/optimize
-Content-Type: application/json
-
-{
-  "origin": { "lat": 14.5995, "lng": 120.9842 },
-  "destination": { "lat": 16.4023, "lng": 120.5960 },
-  "waypoints": [{ "lat": 15.0, "lng": 120.5 }]
 }
 
 ###
