@@ -12,6 +12,7 @@ import weatherRoutes from "./weather.route";
 import routeRoutes from "./route.route";
 import chatbotRoutes from "./chatbot.route";
 import dashboardRoutes from "./dashboard.route";
+import aiRoutes from "./ai.route";
 
 const router = Router();
 
@@ -29,6 +30,7 @@ router.use("/weather", weatherRoutes);
 router.use("/routes", routeRoutes);
 router.use("/chatbots", chatbotRoutes);
 router.use("/dashboard", dashboardRoutes);
+router.use("/ai", aiRoutes);
 
 // Health check route
 router.get("/health", (req, res) => {

@@ -160,6 +160,16 @@ Content-Type: application/json
   "context": "User prefers beaches and light activities."
 }
 
+### Smart Trip: Generate itinerary (stub)
+POST http://localhost:8087/api/v1/ai/itinerary
+Content-Type: application/json
+
+{
+  "destination": "Palawan",
+  "startDate": "2025-01-10",
+  "endDate": "2025-01-12"
+}
+
 ### Payments: Submit proof (user)
 POST http://localhost:8087/api/v1/bookings/{{bookingId}}/payments
 Authorization: Bearer {{userToken}}

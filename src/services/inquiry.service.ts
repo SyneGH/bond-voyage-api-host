@@ -1,5 +1,7 @@
 import { prisma } from "@/config/database";
 import { InquiryStatus } from "@prisma/client";
+import { logActivity } from "@/services/activity-log.service";
+import { NotificationService } from "@/services/notification.service";
 
 export const InquiryService = {
   async createInquiry(
@@ -8,22 +10,37 @@ export const InquiryService = {
     message: string,
     bookingId?: string
   ) {
-    return prisma.inquiry.create({
-      data: {
-        userId,
-        bookingId: bookingId ?? null,
-        subject,
-        status: InquiryStatus.OPEN,
-        messages: {
-          create: {
-            senderId: userId,
-            content: message,
+    return prisma.$transaction(async (tx) => {
+      const inquiry = await tx.inquiry.create({
+        data: {
+          userId,
+          bookingId: bookingId ?? null,
+          subject,
+          status: InquiryStatus.OPEN,
+          messages: {
+            create: {
+              senderId: userId,
+              content: message,
+            },
           },
         },
-      },
-      include: {
-        messages: { orderBy: { sentAt: "asc" } },
-      },
+        include: {
+          messages: { orderBy: { sentAt: "asc" } },
+        },
+      });
+
+      await NotificationService.create(
+        {
+          userId,
+          type: "INQUIRY",
+          title: "Inquiry created",
+          message: `Your inquiry "${subject}" has been received.`,
+          data: { inquiryId: inquiry.id, bookingId: inquiry.bookingId },
+        },
+        tx
+      );
+
+      return inquiry;
     });
   },
 
@@ -77,12 +94,31 @@ export const InquiryService = {
       throw new Error("INQUIRY_FORBIDDEN");
     }
 
-    return prisma.message.create({
+    const message = await prisma.message.create({
       data: {
         inquiryId,
         senderId,
         content,
       },
     });
+
+    await logActivity(
+      prisma,
+      senderId,
+      "Sent Inquiry Message",
+      `Sent inquiry message for inquiry ${inquiryId}`
+    );
+
+    if (isAdmin) {
+      await NotificationService.create({
+        userId: inquiry.userId,
+        type: "INQUIRY",
+        title: "Inquiry reply",
+        message: "You have a new reply to your inquiry.",
+        data: { inquiryId },
+      });
+    }
+
+    return message;
   },
 };
