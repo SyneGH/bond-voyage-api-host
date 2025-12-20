@@ -43,6 +43,133 @@ export const PaymentService = {
     });
   },
 
+  async getPaymentsPaginated(
+    filters: {
+      status?: "PENDING" | "VERIFIED" | "REJECTED";
+      bookingId?: string;
+      dateFrom?: Date;
+      dateTo?: Date;
+    },
+    page = 1,
+    limit = 10
+  ) {
+    const skip = (page - 1) * limit;
+    const whereClause: Prisma.PaymentWhereInput = {};
+
+    if (filters.status) {
+      whereClause.status = filters.status;
+    }
+
+    if (filters.bookingId) {
+      whereClause.bookingId = filters.bookingId;
+    }
+
+    if (filters.dateFrom || filters.dateTo) {
+      whereClause.createdAt = {
+        gte: filters.dateFrom,
+        lte: filters.dateTo,
+      };
+    }
+
+    const [items, total] = await prisma.$transaction([
+      prisma.payment.findMany({
+        where: whereClause,
+        select: {
+          id: true,
+          bookingId: true,
+          submittedById: true,
+          amount: true,
+          method: true,
+          status: true,
+          type: true,
+          transactionId: true,
+          createdAt: true,
+          updatedAt: true,
+          booking: {
+            select: {
+              id: true,
+              destination: true,
+              user: { select: { id: true, firstName: true, lastName: true, email: true } },
+            },
+          },
+          submittedBy: { select: { id: true, firstName: true, lastName: true, email: true } },
+        },
+        orderBy: { createdAt: "desc" },
+        skip,
+        take: limit,
+      }),
+      prisma.payment.count({ where: whereClause }),
+    ]);
+
+    return {
+      items,
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  },
+
+  async getBookingPaymentsPaginated(
+    bookingId: string,
+    page = 1,
+    limit = 10,
+    filters?: {
+      status?: "PENDING" | "VERIFIED" | "REJECTED";
+      dateFrom?: Date;
+      dateTo?: Date;
+    }
+  ) {
+    const skip = (page - 1) * limit;
+    const whereClause: Prisma.PaymentWhereInput = { bookingId };
+
+    if (filters?.status) {
+      whereClause.status = filters.status;
+    }
+
+    if (filters?.dateFrom || filters?.dateTo) {
+      whereClause.createdAt = {
+        gte: filters?.dateFrom,
+        lte: filters?.dateTo,
+      };
+    }
+
+    const [items, total] = await prisma.$transaction([
+      prisma.payment.findMany({
+        where: whereClause,
+        select: {
+          id: true,
+          bookingId: true,
+          submittedById: true,
+          amount: true,
+          method: true,
+          status: true,
+          type: true,
+          transactionId: true,
+          createdAt: true,
+          updatedAt: true,
+          submittedBy: { select: { id: true, firstName: true, lastName: true, email: true } },
+        },
+        orderBy: { createdAt: "desc" },
+        skip,
+        take: limit,
+      }),
+      prisma.payment.count({ where: whereClause }),
+    ]);
+
+    return {
+      items,
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  },
+
   async getPaymentProof(paymentId: string) {
     return prisma.payment.findUnique({
       where: { id: paymentId },
