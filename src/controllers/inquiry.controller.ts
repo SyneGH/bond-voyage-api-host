@@ -10,19 +10,18 @@ import {
 } from "@/validators/inquiry.dto";
 import { AppError, createResponse, throwError } from "@/utils/responseHandler";
 import { HTTP_STATUS } from "@/constants/constants";
+import { requireAuthUser } from "@/utils/requestGuards";
 
 export const InquiryController = {
   list: async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
-      if (!req.user?.userId) {
-        throwError(HTTP_STATUS.UNAUTHORIZED, "Unauthorized");
-      }
+      const authUser = requireAuthUser(req);
 
       const { page, limit, bookingId } = inquiryListQueryDto.parse(req.query);
 
       const result = await InquiryService.listInquiries(
-        req.user.userId,
-        req.user.role === "ADMIN",
+        authUser.userId,
+        authUser.role === "ADMIN",
         { page, limit, bookingId }
       );
 
@@ -50,13 +49,11 @@ export const InquiryController = {
 
   create: async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
-      if (!req.user?.userId) {
-        throwError(HTTP_STATUS.UNAUTHORIZED, "Unauthorized");
-      }
+      const authUser = requireAuthUser(req);
 
       const payload = createInquiryDto.parse(req.body);
       const inquiry = await InquiryService.createInquiry(
-        req.user.userId,
+        authUser.userId,
         payload.subject,
         payload.message,
         payload.bookingId
@@ -80,18 +77,16 @@ export const InquiryController = {
 
   addMessage: async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
-      if (!req.user?.userId) {
-        throwError(HTTP_STATUS.UNAUTHORIZED, "Unauthorized");
-      }
+      const authUser = requireAuthUser(req);
 
       const { id } = inquiryIdParamDto.parse(req.params);
       const payload = addInquiryMessageDto.parse(req.body);
 
       const message = await InquiryService.createMessage(
         id,
-        req.user.userId,
+        authUser.userId,
         payload.content,
-        req.user.role === "ADMIN"
+        authUser.role === "ADMIN"
       );
 
       createResponse(res, HTTP_STATUS.CREATED, "Message sent", message);

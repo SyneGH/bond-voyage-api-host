@@ -1,7 +1,10 @@
 import { prisma } from "@/config/database";
+import { PrismaClient, Prisma } from "@prisma/client";
+
+type ActivityLogClient = Prisma.TransactionClient | PrismaClient;
 
 export async function logActivity(
-  tx: typeof prisma,
+  tx: ActivityLogClient,
   userId: string,
   action: string,
   details?: string
