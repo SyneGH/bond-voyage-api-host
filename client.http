@@ -66,6 +66,18 @@ Content-Type: application/json
 GET http://localhost:8087/api/v1/bookings/{{bookingId}}/collaborators
 Authorization: Bearer {{userToken}}
 
+### Bookings: Shared with me (collaborator)
+GET http://localhost:8087/api/v1/bookings/shared-with-me?page=1&limit=10
+Authorization: Bearer {{userToken}}
+
+### Bookings: Payments list (owner/admin)
+GET http://localhost:8087/api/v1/bookings/{{bookingId}}/payments?page=1&limit=10&status=PENDING
+Authorization: Bearer {{accessToken}}
+
+### Payments: List (admin)
+GET http://localhost:8087/api/v1/payments?page=1&limit=10&status=PENDING&bookingId={{bookingId}}
+Authorization: Bearer {{accessToken}}
+
 ### Payments: Verify (admin)
 PATCH http://localhost:8087/api/v1/payments/{{paymentId}}/status
 Authorization: Bearer {{accessToken}}

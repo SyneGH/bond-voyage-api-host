@@ -12,6 +12,7 @@ router.use(authenticate);
 
 // USER: list
 router.get("/my-bookings", asyncHandler(BookingController.getMyBookings));
+router.get("/shared-with-me", asyncHandler(BookingController.getSharedBookings));
 
 // USER: create
 router.post("/", bookingRateLimit, asyncHandler(BookingController.create));
@@ -25,6 +26,7 @@ router.put("/:id", asyncHandler(BookingController.updateItinerary));
 
 // USER: add payment proof
 router.post("/:id/payments", asyncHandler(PaymentController.create));
+router.get("/:id/payments", asyncHandler(BookingController.getPayments));
 
 // USER: delete draft
 router.delete("/:id", asyncHandler(BookingController.deleteDraft));

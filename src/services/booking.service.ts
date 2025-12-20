@@ -88,6 +88,13 @@ export const BookingService = {
     });
   },
 
+  async getBookingOwner(bookingId: string) {
+    return prisma.booking.findUnique({
+      where: { id: bookingId },
+      select: { userId: true },
+    });
+  },
+
   async updateItinerary(
     bookingId: string,
     userId: string,
@@ -240,6 +247,55 @@ export const BookingService = {
           type: true,
           tourType: true,
           createdAt: true,
+        },
+        orderBy: { createdAt: "desc" },
+        skip,
+        take: limit,
+      }),
+      prisma.booking.count({ where: whereClause }),
+    ]);
+
+    return {
+      items,
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  },
+
+  async getSharedBookingsPaginated(
+    userId: string,
+    page = 1,
+    limit = 10,
+    status?: BookingStatus
+  ) {
+    const skip = (page - 1) * limit;
+    const whereClause: Prisma.BookingWhereInput = {
+      userId: { not: userId },
+      collaborators: { some: { userId } },
+    };
+
+    if (status) {
+      whereClause.status = status;
+    }
+
+    const [items, total] = await prisma.$transaction([
+      prisma.booking.findMany({
+        where: whereClause,
+        select: {
+          id: true,
+          destination: true,
+          startDate: true,
+          endDate: true,
+          totalPrice: true,
+          status: true,
+          type: true,
+          tourType: true,
+          createdAt: true,
+          user: { select: { id: true, firstName: true, lastName: true, email: true } },
         },
         orderBy: { createdAt: "desc" },
         skip,

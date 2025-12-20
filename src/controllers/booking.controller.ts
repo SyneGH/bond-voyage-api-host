@@ -1,8 +1,10 @@
 import { Response } from "express";
 import { AuthenticatedRequest } from "@/types";
 import { BookingService } from "@/services/booking.service";
+import { PaymentService } from "@/services/payment.service";
 import {
   bookingIdParamDto,
+  bookingListQueryDto,
   bookingAdminListQueryDto,
   bookingMyListQueryDto,
   collaboratorIdParamDto,
@@ -12,11 +14,12 @@ import {
 } from "@/validators/booking.dto";
 import { BookingStatus } from "@prisma/client";
 import { AppError, createResponse, throwError } from "@/utils/responseHandler";
-import { HTTP_STATUS } from "@/constants/constants";
+import { HTTP_STATUS, Role } from "@/constants/constants";
 import { ZodError } from "zod";
 import { addCollaboratorDto } from "@/validators/collaboration.dto";
 import userService from "@/services/user.service";
 import { requireAuthUser } from "@/utils/requestGuards";
+import { bookingPaymentListQueryDto } from "@/validators/payment.dto";
 
 export const BookingController = {
   // POST /api/bookings
@@ -193,6 +196,42 @@ export const BookingController = {
     }
   },
 
+  // GET /api/bookings/shared-with-me
+  getSharedBookings: async (
+    req: AuthenticatedRequest,
+    res: Response
+  ): Promise<void> => {
+    try {
+      const authUser = requireAuthUser(req);
+
+      const { page, limit, status } = bookingListQueryDto.parse(req.query);
+
+      const result = await BookingService.getSharedBookingsPaginated(
+        authUser.userId,
+        page,
+        limit,
+        status as BookingStatus | undefined
+      );
+
+      createResponse(res, HTTP_STATUS.OK, "Shared bookings retrieved", {
+        items: result.items,
+        meta: result.meta,
+      });
+    } catch (error) {
+      if (error instanceof ZodError) {
+        throwError(HTTP_STATUS.BAD_REQUEST, "Validation failed", error.errors);
+      }
+      if (error instanceof AppError) {
+        throw error;
+      }
+      throwError(
+        HTTP_STATUS.INTERNAL_SERVER_ERROR,
+        "Internal Server Error",
+        error
+      );
+    }
+  },
+
   // GET /api/bookings/admin/bookings?status=PENDING
   getAllBookings: async (
     req: AuthenticatedRequest,
@@ -222,6 +261,60 @@ export const BookingController = {
         limit
       );
       createResponse(res, HTTP_STATUS.OK, "Bookings retrieved", result.items, result.meta);
+    } catch (error) {
+      if (error instanceof ZodError) {
+        throwError(HTTP_STATUS.BAD_REQUEST, "Validation failed", error.errors);
+      }
+      if (error instanceof AppError) {
+        throw error;
+      }
+      throwError(
+        HTTP_STATUS.INTERNAL_SERVER_ERROR,
+        "Internal Server Error",
+        error
+      );
+    }
+  },
+
+  // GET /api/bookings/:id/payments
+  getPayments: async (
+    req: AuthenticatedRequest,
+    res: Response
+  ): Promise<void> => {
+    try {
+      const authUser = requireAuthUser(req);
+      const { id } = bookingIdParamDto.parse(req.params);
+      const { page, limit, status, dateFrom, dateTo } =
+        bookingPaymentListQueryDto.parse(req.query);
+
+      const booking = await BookingService.getBookingOwner(id);
+      if (!booking) {
+        throwError(HTTP_STATUS.NOT_FOUND, "Booking not found");
+      }
+
+      const bookingRecord = booking as NonNullable<typeof booking>;
+      const isAdmin = authUser.role === Role.ADMIN;
+      const isOwner = bookingRecord.userId === authUser.userId;
+
+      if (!isAdmin && !isOwner) {
+        throwError(HTTP_STATUS.FORBIDDEN, "Forbidden");
+      }
+
+      const result = await PaymentService.getBookingPaymentsPaginated(
+        id,
+        page,
+        limit,
+        {
+          status: status ?? undefined,
+          dateFrom,
+          dateTo,
+        }
+      );
+
+      createResponse(res, HTTP_STATUS.OK, "Payments retrieved", {
+        items: result.items,
+        meta: result.meta,
+      });
     } catch (error) {
       if (error instanceof ZodError) {
         throwError(HTTP_STATUS.BAD_REQUEST, "Validation failed", error.errors);

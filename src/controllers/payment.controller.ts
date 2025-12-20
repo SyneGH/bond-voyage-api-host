@@ -6,6 +6,7 @@ import { bookingIdParamDto } from "@/validators/booking.dto";
 import {
   createPaymentDto,
   paymentIdParamDto,
+  paymentListQueryDto,
   updatePaymentStatusDto,
 } from "@/validators/payment.dto";
 import { AppError, createResponse, throwError } from "@/utils/responseHandler";
@@ -89,6 +90,41 @@ export const PaymentController = {
       throwError(
         HTTP_STATUS.INTERNAL_SERVER_ERROR,
         "Failed to update payment",
+        error
+      );
+    }
+  },
+
+  list: async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const { page, limit, status, bookingId, dateFrom, dateTo } =
+        paymentListQueryDto.parse(req.query);
+
+      const result = await PaymentService.getPaymentsPaginated(
+        {
+          status: status ?? undefined,
+          bookingId,
+          dateFrom,
+          dateTo,
+        },
+        page,
+        limit
+      );
+
+      createResponse(res, HTTP_STATUS.OK, "Payments retrieved", {
+        items: result.items,
+        meta: result.meta,
+      });
+    } catch (error) {
+      if (error instanceof ZodError) {
+        throwError(HTTP_STATUS.BAD_REQUEST, "Validation failed", error.errors);
+      }
+      if (error instanceof AppError) {
+        throw error;
+      }
+      throwError(
+        HTTP_STATUS.INTERNAL_SERVER_ERROR,
+        "Failed to fetch payments",
         error
       );
     }

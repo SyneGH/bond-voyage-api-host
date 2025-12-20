@@ -7,6 +7,13 @@ import { asyncHandler } from "@/middlewares/async.middleware";
 const router = Router();
 
 router.get(
+  "/",
+  authenticate,
+  authorize([Role.ADMIN]),
+  asyncHandler(PaymentController.list)
+);
+
+router.get(
   "/:id/proof",
   authenticate,
   asyncHandler(PaymentController.getProof)
