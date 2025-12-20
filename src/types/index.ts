@@ -30,7 +30,7 @@ export interface RegisterDto {
   middleName?: string;
   lastName: string;
   phoneNumber: string;
-  birthday: string;
+  birthday?: string;
   employeeId?: string;
   email: string;
   password: string;

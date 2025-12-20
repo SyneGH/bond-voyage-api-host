@@ -10,13 +10,12 @@ import {
 } from "@/validators/payment.dto";
 import { AppError, createResponse, throwError } from "@/utils/responseHandler";
 import { HTTP_STATUS, Role } from "@/constants/constants";
+import { requireAuthUser } from "@/utils/requestGuards";
 
 export const PaymentController = {
   create: async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
-      if (!req.user?.userId) {
-        throwError(HTTP_STATUS.UNAUTHORIZED, "Unauthorized");
-      }
+      const authUser = requireAuthUser(req);
 
       const { id: bookingId } = bookingIdParamDto.parse(req.params);
       const payload = createPaymentDto.parse(req.body);
@@ -34,7 +33,8 @@ export const PaymentController = {
           throwError(HTTP_STATUS.BAD_REQUEST, "Invalid proof image");
         }
 
-        proofImage = Buffer.from(base64, "base64");
+        const proofImageBase64 = base64 as string;
+        proofImage = Buffer.from(proofImageBase64, "base64");
         proofSize = proofImage.length;
 
         if (proofSize > maxBytes) {
@@ -44,7 +44,7 @@ export const PaymentController = {
 
       const payment = await PaymentService.createPayment({
         bookingId,
-        userId: req.user.userId,
+        userId: authUser.userId,
         amount: payload.amount,
         method: payload.method,
         type: payload.type,
@@ -96,9 +96,7 @@ export const PaymentController = {
 
   getProof: async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
-      if (!req.user?.userId) {
-        throwError(HTTP_STATUS.UNAUTHORIZED, "Unauthorized");
-      }
+      const authUser = requireAuthUser(req);
 
       const { id } = paymentIdParamDto.parse(req.params);
       const payment = await PaymentService.getPaymentProof(id);
@@ -107,28 +105,29 @@ export const PaymentController = {
         throwError(HTTP_STATUS.NOT_FOUND, "Payment not found");
       }
 
-      const isAdmin = req.user.role === Role.ADMIN;
-      const isOwner = payment.booking?.userId === req.user.userId;
-      const isSubmitter = payment.submittedById === req.user.userId;
+      const paymentRecord = payment as NonNullable<typeof payment>;
+      const isAdmin = authUser.role === Role.ADMIN;
+      const isOwner = paymentRecord.booking?.userId === authUser.userId;
+      const isSubmitter = paymentRecord.submittedById === authUser.userId;
 
       if (!isAdmin && !isOwner && !isSubmitter) {
         throwError(HTTP_STATUS.FORBIDDEN, "Insufficient permissions");
       }
 
-      if (!payment.proofImage) {
+      if (!paymentRecord.proofImage) {
         throwError(HTTP_STATUS.NOT_FOUND, "Payment proof not found");
       }
 
-      if (payment.proofSize) {
-        res.setHeader("Content-Length", payment.proofSize.toString());
+      if (paymentRecord.proofSize) {
+        res.setHeader("Content-Length", paymentRecord.proofSize.toString());
       }
 
       res.setHeader(
         "Content-Type",
-        payment.proofMimeType ?? "application/octet-stream"
+        paymentRecord.proofMimeType ?? "application/octet-stream"
       );
 
-      res.status(HTTP_STATUS.OK).send(payment.proofImage);
+      res.status(HTTP_STATUS.OK).send(paymentRecord.proofImage);
     } catch (error) {
       if (error instanceof ZodError) {
         throwError(HTTP_STATUS.BAD_REQUEST, "Validation failed", error.errors);

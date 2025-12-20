@@ -29,6 +29,12 @@ class AuthController {
       const { user, accessToken, refreshToken } =
         await authService.register(payload);
 
+      if (!user) {
+        throwError(HTTP_STATUS.INTERNAL_SERVER_ERROR, "Registration failed");
+      }
+
+      const authUser = user as NonNullable<typeof user>;
+
       res.cookie("refreshToken", refreshToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
@@ -38,13 +44,13 @@ class AuthController {
 
       createResponse(res, HTTP_STATUS.CREATED, "Registration successful", {
         user: {
-          id: user.id,
-          email: user.email,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          phoneNumber: user.phoneNumber,
-          role: user.role,
-          companyName: user.companyName,
+          id: authUser.id,
+          email: authUser.email,
+          firstName: authUser.firstName,
+          lastName: authUser.lastName,
+          phoneNumber: authUser.phoneNumber,
+          role: authUser.role,
+          companyName: authUser.companyName,
         },
         accessToken,
       });
@@ -70,6 +76,12 @@ class AuthController {
         payload.password
       );
 
+      if (!user) {
+        throwError(HTTP_STATUS.UNAUTHORIZED, "Invalid credentials");
+      }
+
+      const authUser = user as NonNullable<typeof user>;
+
       res.cookie("refreshToken", refreshToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
@@ -79,15 +91,15 @@ class AuthController {
 
       createResponse(res, HTTP_STATUS.OK, "Login successful", {
         user: {
-          id: user.id,
-          email: user.email,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          phoneNumber: user.phoneNumber,
-          role: user.role,
-          avatarUrl: user.avatarUrl,
-          companyName: user.companyName,
-          customerRating: user.customerRating,
+          id: authUser.id,
+          email: authUser.email,
+          firstName: authUser.firstName,
+          lastName: authUser.lastName,
+          phoneNumber: authUser.phoneNumber,
+          role: authUser.role,
+          avatarUrl: authUser.avatarUrl,
+          companyName: authUser.companyName,
+          customerRating: authUser.customerRating,
         },
         accessToken,
       });

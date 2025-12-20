@@ -10,17 +10,16 @@ import {
 } from "@/validators/feedback.dto";
 import { AppError, createResponse, throwError } from "@/utils/responseHandler";
 import { HTTP_STATUS } from "@/constants/constants";
+import { requireAuthUser } from "@/utils/requestGuards";
 
 export const FeedbackController = {
   create: async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
-      if (!req.user?.userId) {
-        throwError(HTTP_STATUS.UNAUTHORIZED, "Unauthorized");
-      }
+      const authUser = requireAuthUser(req);
 
       const payload = createFeedbackDto.parse(req.body);
       const feedback = await FeedbackService.create(
-        req.user.userId,
+        authUser.userId,
         payload.rating,
         payload.comment
       );
@@ -37,7 +36,7 @@ export const FeedbackController = {
     }
   },
 
-  list: async (_req: AuthenticatedRequest, res: Response): Promise<void> => {
+  list: async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
       const { page, limit } = feedbackListQueryDto.parse(req.query);
       const result = await FeedbackService.list({ page, limit });
@@ -62,16 +61,14 @@ export const FeedbackController = {
 
   respond: async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
-      if (!req.user?.userId) {
-        throwError(HTTP_STATUS.UNAUTHORIZED, "Unauthorized");
-      }
+      const authUser = requireAuthUser(req);
 
       const { id } = feedbackIdParamDto.parse(req.params);
       const payload = respondFeedbackDto.parse(req.body);
 
       const feedback = await FeedbackService.respond(
         id,
-        req.user.userId,
+        authUser.userId,
         payload.response
       );
 
