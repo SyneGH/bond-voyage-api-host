@@ -1,6 +1,6 @@
 import { prisma } from "@/config/database";
 import { AuthUtils } from "@/utils/auth";
-import { UserRole } from "@prisma/client";
+import { User, UserRole } from "@prisma/client";
 import userService from "@/services/user.service";
 import { throwError } from "@/utils/responseHandler";
 import { HTTP_STATUS } from "@/constants/constants";
@@ -18,7 +18,9 @@ interface RegisterInput {
 }
 
 export class AuthService {
-  async register(data: RegisterInput) {
+  async register(
+    data: RegisterInput
+  ): Promise<{ user: User; accessToken: string; refreshToken: string }> {
     const existingUser = await prisma.user.findFirst({
       where: {
         OR: [{ email: data.email }, { phoneNumber: data.phoneNumber }],
@@ -73,10 +75,22 @@ export class AuthService {
     return { user, accessToken, refreshToken };
   }
 
-  async login(email: string, password: string) {
+  async login(
+    email: string,
+    password: string
+  ): Promise<{ user: User; accessToken: string; refreshToken: string }> {
     const user = await prisma.user.findUnique({ where: { email } });
 
-    if (!user || !user.isActive) {
+    if (!user) {
+      throwError(
+        HTTP_STATUS.UNAUTHORIZED,
+        "Invalid credentials or inactive account"
+      );
+    }
+
+    const authUser = user as NonNullable<typeof user>;
+
+    if (!authUser.isActive) {
       throwError(
         HTTP_STATUS.UNAUTHORIZED,
         "Invalid credentials or inactive account"
@@ -85,24 +99,24 @@ export class AuthService {
 
     const validPassword = await userService.comparePassword(
       password,
-      user.password
+      authUser.password
     );
     if (!validPassword) {
       throwError(HTTP_STATUS.UNAUTHORIZED, "Invalid credentials");
     }
 
     const tokenPayload = {
-      userId: user.id,
-      email: user.email,
-      phoneNumber: user.phoneNumber,
-      role: user.role,
+      userId: authUser.id,
+      email: authUser.email,
+      phoneNumber: authUser.phoneNumber,
+      role: authUser.role,
     };
 
     const { accessToken, refreshToken } =
       AuthUtils.generateTokenPair(tokenPayload);
 
     await prisma.user.update({
-      where: { id: user.id },
+      where: { id: authUser.id },
       data: {
         refreshTokens: {
           push: refreshToken,
@@ -111,7 +125,7 @@ export class AuthService {
       },
     });
 
-    return { user, accessToken, refreshToken };
+    return { user: authUser, accessToken, refreshToken };
   }
 
   async refreshToken(refreshToken: string) {
@@ -120,24 +134,30 @@ export class AuthService {
       where: { id: decoded.userId },
     });
 
-    if (!user || !user.isActive || !user.refreshTokens.includes(refreshToken)) {
+    if (!user) {
+      throwError(HTTP_STATUS.UNAUTHORIZED, "Invalid refresh token");
+    }
+
+    const authUser = user as NonNullable<typeof user>;
+
+    if (!authUser.isActive || !authUser.refreshTokens.includes(refreshToken)) {
       throwError(HTTP_STATUS.UNAUTHORIZED, "Invalid refresh token");
     }
 
     const tokenPayload = {
-      userId: user.id,
-      email: user.email,
-      phoneNumber: user.phoneNumber,
-      role: user.role,
+      userId: authUser.id,
+      email: authUser.email,
+      phoneNumber: authUser.phoneNumber,
+      role: authUser.role,
     };
 
     const { accessToken, refreshToken: newRefreshToken } =
       AuthUtils.generateTokenPair(tokenPayload);
 
     await prisma.user.update({
-      where: { id: user.id },
+      where: { id: authUser.id },
       data: {
-        refreshTokens: user.refreshTokens
+        refreshTokens: authUser.refreshTokens
           .filter((token) => token !== refreshToken)
           .concat(newRefreshToken),
       },

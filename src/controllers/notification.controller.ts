@@ -5,15 +5,14 @@ import { AuthenticatedRequest } from "@/types";
 import { notificationIdParamDto } from "@/validators/notification.dto";
 import { AppError, createResponse, throwError } from "@/utils/responseHandler";
 import { HTTP_STATUS } from "@/constants/constants";
+import { requireAuthUser } from "@/utils/requestGuards";
 
 export const NotificationController = {
   list: async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
-      if (!req.user?.userId) {
-        throwError(HTTP_STATUS.UNAUTHORIZED, "Unauthorized");
-      }
+      const authUser = requireAuthUser(req);
 
-      const notifications = await NotificationService.list(req.user.userId);
+      const notifications = await NotificationService.list(authUser.userId);
       createResponse(res, HTTP_STATUS.OK, "Notifications retrieved", notifications);
     } catch (error) {
       if (error instanceof ZodError) {
@@ -32,12 +31,9 @@ export const NotificationController = {
 
   markRead: async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
-      if (!req.user?.userId) {
-        throwError(HTTP_STATUS.UNAUTHORIZED, "Unauthorized");
-      }
-
+      const authUser = requireAuthUser(req);
       const { id } = notificationIdParamDto.parse(req.params);
-      await NotificationService.markRead(id, req.user.userId);
+      await NotificationService.markRead(id, authUser.userId);
       createResponse(res, HTTP_STATUS.OK, "Notification marked as read");
     } catch (error) {
       if (error instanceof ZodError) {

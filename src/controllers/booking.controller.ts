@@ -16,6 +16,7 @@ import { HTTP_STATUS } from "@/constants/constants";
 import { ZodError } from "zod";
 import { addCollaboratorDto } from "@/validators/collaboration.dto";
 import userService from "@/services/user.service";
+import { requireAuthUser } from "@/utils/requestGuards";
 
 export const BookingController = {
   // POST /api/bookings
@@ -23,13 +24,11 @@ export const BookingController = {
     try {
       const payload = createBookingDto.parse(req.body);
 
-      if (!req.user?.userId) {
-        throwError(HTTP_STATUS.UNAUTHORIZED, "Unauthorized");
-      }
+      const authUser = requireAuthUser(req);
 
       const booking = await BookingService.createBooking({
         ...payload,
-        userId: req.user.userId,
+        userId: authUser.userId,
       });
 
       createResponse(res, HTTP_STATUS.CREATED, "Booking created", booking);
@@ -57,9 +56,12 @@ export const BookingController = {
         throwError(HTTP_STATUS.NOT_FOUND, "Booking not found");
       }
 
-      if (req.user?.role !== "ADMIN" && booking.userId !== req.user?.userId) {
-        const isCollaborator = booking.collaborators?.some(
-          (collab) => collab.userId === req.user?.userId
+      const authUser = requireAuthUser(req);
+      const bookingRecord = booking as NonNullable<typeof booking>;
+
+      if (authUser.role !== "ADMIN" && bookingRecord.userId !== authUser.userId) {
+        const isCollaborator = bookingRecord.collaborators?.some(
+          (collab) => collab.userId === authUser.userId
         );
 
         if (!isCollaborator) {
@@ -67,7 +69,7 @@ export const BookingController = {
         }
       }
 
-      createResponse(res, HTTP_STATUS.OK, "Booking retrieved", booking);
+      createResponse(res, HTTP_STATUS.OK, "Booking retrieved", bookingRecord);
     } catch (error) {
       if (error instanceof ZodError) {
         throwError(HTTP_STATUS.BAD_REQUEST, "Validation failed", error.errors);
@@ -92,11 +94,9 @@ export const BookingController = {
       const { id } = bookingIdParamDto.parse(req.params);
       const payload = updateItineraryDto.parse(req.body);
 
-      if (!req.user?.userId) {
-        throwError(HTTP_STATUS.UNAUTHORIZED, "Unauthorized");
-      }
+      const authUser = requireAuthUser(req);
 
-      await BookingService.updateItinerary(id, req.user.userId, payload);
+      await BookingService.updateItinerary(id, authUser.userId, payload);
 
       const updated = await BookingService.getBookingById(id);
       createResponse(res, HTTP_STATUS.OK, "Booking updated", updated);
@@ -136,12 +136,13 @@ export const BookingController = {
       const { id } = bookingIdParamDto.parse(req.params);
       const payload = updateStatusDto.parse(req.body);
 
+      const actorId = req.user?.userId;
       const updated = await BookingService.updateStatus(
         id,
         payload.status as BookingStatus,
         payload.rejectionReason,
         payload.rejectionResolution,
-        req.user?.userId
+        actorId
       );
       createResponse(res, HTTP_STATUS.OK, "Booking status updated", updated);
     } catch (error) {
@@ -165,14 +166,12 @@ export const BookingController = {
     res: Response
   ): Promise<void> => {
     try {
-      if (!req.user?.userId) {
-        throwError(HTTP_STATUS.UNAUTHORIZED, "Unauthorized");
-      }
+      const authUser = requireAuthUser(req);
 
       const { page, limit, status } = bookingMyListQueryDto.parse(req.query);
 
       const result = await BookingService.getUserBookingsPaginated(
-        req.user.userId,
+        authUser.userId,
         page,
         limit,
         status as BookingStatus | undefined
@@ -244,12 +243,10 @@ export const BookingController = {
     res: Response
   ): Promise<void> => {
     try {
-      if (!req.user?.userId) {
-        throwError(HTTP_STATUS.UNAUTHORIZED, "Unauthorized");
-      }
+      const authUser = requireAuthUser(req);
 
       const { id } = bookingIdParamDto.parse(req.params);
-      await BookingService.deleteBookingDraft(id, req.user.userId);
+      await BookingService.deleteBookingDraft(id, authUser.userId);
       createResponse(res, HTTP_STATUS.OK, "Booking deleted");
     } catch (error: any) {
       if (error instanceof ZodError) {
@@ -275,12 +272,10 @@ export const BookingController = {
   // PATCH /api/bookings/:id/submit  (DRAFT -> PENDING)
   submit: async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
-      if (!req.user?.userId) {
-        throwError(HTTP_STATUS.UNAUTHORIZED, "Unauthorized");
-      }
+      const authUser = requireAuthUser(req);
 
       const { id } = bookingIdParamDto.parse(req.params);
-      const updated = await BookingService.submitBooking(id, req.user.userId);
+      const updated = await BookingService.submitBooking(id, authUser.userId);
       createResponse(res, HTTP_STATUS.OK, "Booking submitted", updated);
     } catch (error: any) {
       if (error instanceof ZodError) {
@@ -306,12 +301,10 @@ export const BookingController = {
   // PATCH /api/bookings/:id/cancel
   cancel: async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
-      if (!req.user?.userId) {
-        throwError(HTTP_STATUS.UNAUTHORIZED, "Unauthorized");
-      }
+      const authUser = requireAuthUser(req);
 
       const { id } = bookingIdParamDto.parse(req.params);
-      const updated = await BookingService.cancelBooking(id, req.user.userId);
+      const updated = await BookingService.cancelBooking(id, authUser.userId);
       createResponse(res, HTTP_STATUS.OK, "Booking cancelled", updated);
     } catch (error: any) {
       if (error instanceof ZodError) {
@@ -340,9 +333,7 @@ export const BookingController = {
     res: Response
   ): Promise<void> => {
     try {
-      if (!req.user?.userId) {
-        throwError(HTTP_STATUS.UNAUTHORIZED, "Unauthorized");
-      }
+      const authUser = requireAuthUser(req);
 
       const { id } = bookingIdParamDto.parse(req.params);
       const payload = addCollaboratorDto.parse(req.body);
@@ -354,17 +345,19 @@ export const BookingController = {
         if (!user) {
           throwError(HTTP_STATUS.NOT_FOUND, "Collaborator not found");
         }
-        collaboratorId = user.id;
+        const collaboratorUser = user as NonNullable<typeof user>;
+        collaboratorId = collaboratorUser.id;
       }
 
       if (!collaboratorId) {
         throwError(HTTP_STATUS.BAD_REQUEST, "Collaborator identifier required");
       }
 
+      const collaboratorUserId = collaboratorId as string;
       const collaborator = await BookingService.addCollaborator(
         id,
-        req.user.userId,
-        collaboratorId
+        authUser.userId,
+        collaboratorUserId
       );
 
       createResponse(res, HTTP_STATUS.CREATED, "Collaborator added", collaborator);
@@ -398,14 +391,12 @@ export const BookingController = {
     res: Response
   ): Promise<void> => {
     try {
-      if (!req.user?.userId) {
-        throwError(HTTP_STATUS.UNAUTHORIZED, "Unauthorized");
-      }
+      const authUser = requireAuthUser(req);
 
       const { id } = bookingIdParamDto.parse(req.params);
       const collaborators = await BookingService.listCollaborators(
         id,
-        req.user.userId
+        authUser.userId
       );
 
       createResponse(res, HTTP_STATUS.OK, "Collaborators retrieved", collaborators);
@@ -436,16 +427,14 @@ export const BookingController = {
     res: Response
   ): Promise<void> => {
     try {
-      if (!req.user?.userId) {
-        throwError(HTTP_STATUS.UNAUTHORIZED, "Unauthorized");
-      }
+      const authUser = requireAuthUser(req);
 
       const { id } = bookingIdParamDto.parse(req.params);
       const { collaboratorId } = collaboratorIdParamDto.parse(req.params);
 
       await BookingService.removeCollaborator(
         id,
-        req.user.userId,
+        authUser.userId,
         collaboratorId
       );
 

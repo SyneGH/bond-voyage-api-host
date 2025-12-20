@@ -14,6 +14,7 @@ import {
   userIdParamDto,
   userListQueryDto,
 } from "@/validators/user.dto";
+import { requireAuthUser } from "@/utils/requestGuards";
 
 class UserController {
   // Cache TTL constants (in seconds)
@@ -86,7 +87,9 @@ class UserController {
         throwError(HTTP_STATUS.CONFLICT, message);
       }
 
-      const user = await userService.createWithLog(req.user!.userId, payload);
+      const authUser = requireAuthUser(req);
+
+      const user = await userService.createWithLog(authUser.userId, payload);
 
       createResponse(res, HTTP_STATUS.CREATED, "User registered successfully", {
         user: userService.transformUser(user),
@@ -244,7 +247,9 @@ class UserController {
         throwError(HTTP_STATUS.NOT_FOUND, "User not found");
       }
 
-      const transformedUser = userService.transformUser(user);
+      const transformedUser = userService.transformUser(
+        user as NonNullable<typeof user>
+      );
 
       await redis.setex(
         cacheKey,
@@ -282,8 +287,9 @@ class UserController {
 
       await this.invalidateUserCaches(userId);
 
+      const updatedUser = user as NonNullable<typeof user>;
       createResponse(res, HTTP_STATUS.OK, "User updated successfully", {
-        user: userService.transformUser(user),
+        user: userService.transformUser(updatedUser),
       });
     } catch (error) {
       if (error instanceof ZodError) {
@@ -302,23 +308,22 @@ class UserController {
     res: Response
   ): Promise<void> => {
     try {
-      const userId = req.user?.userId;
-
-      if (!userId) {
-        throwError(HTTP_STATUS.BAD_REQUEST, "User id is required");
-      }
+      const authUser = requireAuthUser(req);
 
       const updateData = updateProfileDto.parse(req.body);
-      const user = await userService.updateProfileWithLog(userId, updateData);
+      const user = await userService.updateProfileWithLog(
+        authUser.userId,
+        updateData
+      );
 
       if (!user) {
         throwError(HTTP_STATUS.BAD_REQUEST, "User not found");
       }
 
-      await this.invalidateUserCaches(userId);
+      await this.invalidateUserCaches(authUser.userId);
 
       createResponse(res, HTTP_STATUS.OK, "Profile updated successfully", {
-        user: userService.transformUser(user),
+        user: userService.transformUser(user as NonNullable<typeof user>),
       });
     } catch (error) {
       if (error instanceof ZodError) {
@@ -338,7 +343,8 @@ class UserController {
   ): Promise<void> => {
     try {
       const { id: userId } = userIdParamDto.parse(req.params);
-      const user = await userService.deactivateWithLog(req.user!.userId, userId);
+      const authUser = requireAuthUser(req);
+      const user = await userService.deactivateWithLog(authUser.userId, userId);
 
       if (!user) {
         throwError(HTTP_STATUS.NOT_FOUND, "User not found");
@@ -365,7 +371,8 @@ class UserController {
   ): Promise<void> => {
     try {
       const { id: userId } = userIdParamDto.parse(req.params);
-      const user = await userService.deleteWithLog(req.user!.userId, userId);
+      const authUser = requireAuthUser(req);
+      const user = await userService.deleteWithLog(authUser.userId, userId);
 
       if (!user) {
         throwError(HTTP_STATUS.NOT_FOUND, "User not found");
@@ -391,21 +398,19 @@ class UserController {
     res: Response
   ): Promise<void> => {
     try {
-      const userId = req.user?.userId;
-      if (!userId) {
-        throwError(HTTP_STATUS.BAD_REQUEST, "User id is required");
-      }
+      const authUser = requireAuthUser(req);
 
       const payload = changePasswordDto.parse(req.body);
-      const user = await userService.findByIdWithPassword(userId);
+      const user = await userService.findByIdWithPassword(authUser.userId);
 
       if (!user) {
         throwError(HTTP_STATUS.NOT_FOUND, "User not found");
       }
 
+      const existingUser = user as NonNullable<typeof user>;
       const isPasswordMatched = await userService.comparePassword(
         payload.oldPassword,
-        user.password
+        existingUser.password
       );
 
       if (!isPasswordMatched) {
@@ -416,9 +421,9 @@ class UserController {
         payload.newPassword
       );
 
-      await userService.updateById(userId, { password: hashedNewPassword });
+      await userService.updateById(authUser.userId, { password: hashedNewPassword });
 
-      await redis.del(this.generateCacheKey.singleUser(userId));
+      await redis.del(this.generateCacheKey.singleUser(authUser.userId));
 
       createResponse(res, HTTP_STATUS.OK, "Password updated successfully");
     } catch (error) {
