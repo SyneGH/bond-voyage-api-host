@@ -1,6 +1,7 @@
 import { BookingStatus, Prisma } from "@prisma/client";
 import { prisma } from "@/config/database";
 import { logActivity } from "@/services/activity-log.service";
+import { NotificationService } from "@/services/notification.service";
 
 interface CreateBookingDTO {
   userId: string;
@@ -61,6 +62,16 @@ export const BookingService = {
         data.userId,
         "Created Booking",
         `Created booking ${booking.id} for ${booking.destination}`
+      );
+      await NotificationService.create(
+        {
+          userId: data.userId,
+          type: "BOOKING",
+          title: "Booking created",
+          message: `Your booking to ${booking.destination} has been created.`,
+          data: { bookingId: booking.id },
+        },
+        tx
       );
 
       return booking;
@@ -442,6 +453,16 @@ export const BookingService = {
         userId,
         "Submitted Booking",
         `Submitted booking ${bookingId} for approval`
+      );
+      await NotificationService.create(
+        {
+          userId,
+          type: "BOOKING",
+          title: "Booking submitted",
+          message: `Your booking ${bookingId} has been submitted for approval.`,
+          data: { bookingId },
+        },
+        tx
       );
 
       return updated;

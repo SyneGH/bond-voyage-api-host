@@ -1,5 +1,7 @@
 import { prisma } from "@/config/database";
 import { Prisma } from "@prisma/client";
+import { logActivity } from "@/services/activity-log.service";
+import { NotificationService } from "@/services/notification.service";
 
 interface CreatePaymentInput {
   bookingId: string;
@@ -15,24 +17,45 @@ interface CreatePaymentInput {
 
 export const PaymentService = {
   async createPayment(data: CreatePaymentInput) {
-    const booking = await prisma.booking.findFirst({
-      where: { id: data.bookingId, userId: data.userId },
-    });
+    return prisma.$transaction(async (tx) => {
+      const booking = await tx.booking.findFirst({
+        where: { id: data.bookingId, userId: data.userId },
+      });
 
-    if (!booking) throw new Error("BOOKING_NOT_FOUND");
+      if (!booking) throw new Error("BOOKING_NOT_FOUND");
 
-    return prisma.payment.create({
-      data: {
-        bookingId: data.bookingId,
-        submittedById: data.userId,
-        amount: data.amount as unknown as Prisma.Decimal,
-        method: data.method ?? "GCASH",
-        type: data.type ?? "PARTIAL",
-        proofImage: data.proofImage,
-        proofMimeType: data.proofMimeType ?? null,
-        proofSize: data.proofSize ?? null,
-        transactionId: data.transactionId ?? null,
-      },
+      const payment = await tx.payment.create({
+        data: {
+          bookingId: data.bookingId,
+          submittedById: data.userId,
+          amount: data.amount as unknown as Prisma.Decimal,
+          method: data.method ?? "GCASH",
+          type: data.type ?? "PARTIAL",
+          proofImage: data.proofImage,
+          proofMimeType: data.proofMimeType ?? null,
+          proofSize: data.proofSize ?? null,
+          transactionId: data.transactionId ?? null,
+        },
+      });
+
+      await logActivity(
+        tx,
+        data.userId,
+        "Submitted Payment",
+        `Submitted payment ${payment.id} for booking ${booking.id}`
+      );
+      await NotificationService.create(
+        {
+          userId: data.userId,
+          type: "PAYMENT",
+          title: "Payment submitted",
+          message: `Your payment for booking ${booking.id} has been submitted.`,
+          data: { bookingId: booking.id, paymentId: payment.id },
+        },
+        tx
+      );
+
+      return payment;
     });
   },
 
