@@ -12,11 +12,9 @@ export const WeatherController = {
       const apiKey = process.env.OPENWEATHER_API_KEY;
 
       if (!apiKey) {
-        throwError(
-          HTTP_STATUS.BAD_REQUEST,
-          "Weather API key not configured",
-          { missing: "OPENWEATHER_API_KEY" }
-        );
+        const mockCurrent = buildMockCurrentWeather(lat, lng);
+        createResponse(res, HTTP_STATUS.OK, "Weather retrieved", mockCurrent);
+        return;
       }
 
       const response = await axios.get(
@@ -90,6 +88,19 @@ export const WeatherController = {
       );
     }
   },
+};
+
+const buildMockCurrentWeather = (lat: number, lng: number) => {
+  const temperatureC = Math.round(((lat + lng) % 12) + 18);
+  return {
+    lat,
+    lng,
+    unit: "metric",
+    temperatureC,
+    description: temperatureC > 22 ? "Sunny" : "Partly cloudy",
+    observedAt: new Date().toISOString(),
+    source: "mock",
+  };
 };
 
 const buildMockForecast = (lat: number, lng: number) => {

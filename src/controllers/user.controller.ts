@@ -128,10 +128,17 @@ class UserController {
       );
       const countCacheKey = this.generateCacheKey.userCount(q, role, isActive);
 
-      const [cachedUsers, cachedCount] = await Promise.all([
-        redis.get(listCacheKey),
-        redis.get(countCacheKey),
-      ]);
+      let cachedUsers: string | null = null;
+      let cachedCount: string | null = null;
+
+      try {
+        [cachedUsers, cachedCount] = await Promise.all([
+          redis.get(listCacheKey),
+          redis.get(countCacheKey),
+        ]);
+      } catch (error) {
+        console.warn("User list cache lookup failed", error);
+      }
 
       if (cachedUsers && cachedCount) {
         const users = JSON.parse(cachedUsers);
@@ -187,14 +194,22 @@ class UserController {
         userService.transformUser(user)
       );
 
-      await Promise.all([
-        redis.setex(
-          listCacheKey,
-          this.CACHE_TTL.USER_LIST,
-          JSON.stringify(transformedUsers)
-        ),
-        redis.setex(countCacheKey, this.CACHE_TTL.USER_LIST, total.toString()),
-      ]);
+      try {
+        await Promise.all([
+          redis.setex(
+            listCacheKey,
+            this.CACHE_TTL.USER_LIST,
+            JSON.stringify(transformedUsers)
+          ),
+          redis.setex(
+            countCacheKey,
+            this.CACHE_TTL.USER_LIST,
+            total.toString()
+          ),
+        ]);
+      } catch (error) {
+        console.warn("User list cache update failed", error);
+      }
 
       const meta = {
         page,
@@ -233,7 +248,13 @@ class UserController {
       const { id: userId } = userIdParamDto.parse(req.params);
 
       const cacheKey = this.generateCacheKey.singleUser(userId);
-      const cachedUser = await redis.get(cacheKey);
+      let cachedUser: string | null = null;
+
+      try {
+        cachedUser = await redis.get(cacheKey);
+      } catch (error) {
+        console.warn("User cache lookup failed", error);
+      }
 
       if (cachedUser) {
         const user = JSON.parse(cachedUser);
@@ -251,11 +272,15 @@ class UserController {
         user as NonNullable<typeof user>
       );
 
-      await redis.setex(
-        cacheKey,
-        this.CACHE_TTL.SINGLE_USER,
-        JSON.stringify(transformedUser)
-      );
+      try {
+        await redis.setex(
+          cacheKey,
+          this.CACHE_TTL.SINGLE_USER,
+          JSON.stringify(transformedUser)
+        );
+      } catch (error) {
+        console.warn("User cache update failed", error);
+      }
 
       createResponse(res, HTTP_STATUS.OK, "User found", {
         user: transformedUser,
