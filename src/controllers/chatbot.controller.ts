@@ -29,20 +29,20 @@ export const ChatbotController = {
         payload.message,
         payload.context
       );
-      createResponse(res, HTTP_STATUS.OK, "Roaman response", response);
+      const responseMessage =
+        response &&
+        typeof response === "object" &&
+        "fallback" in response &&
+        response.fallback
+          ? "Roaman fallback response"
+          : "Roaman response";
+      createResponse(res, HTTP_STATUS.OK, responseMessage, response);
     } catch (error: any) {
       if (error instanceof ZodError) {
         throwError(HTTP_STATUS.BAD_REQUEST, "Validation failed", error.errors);
       }
       if (error instanceof AppError) {
         throw error;
-      }
-      if (error?.message === "GEMINI_KEY_MISSING") {
-        throwError(
-          HTTP_STATUS.BAD_REQUEST,
-          "Gemini API key not configured",
-          { missing: "GEMINI_API_KEY" }
-        );
       }
       throwError(HTTP_STATUS.INTERNAL_SERVER_ERROR, "Roaman failed", error);
     }

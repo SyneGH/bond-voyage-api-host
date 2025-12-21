@@ -115,8 +115,8 @@ export const bookingIdParamDto = z.object({
   id: z.string().uuid(),
 });
 
-export const collaboratorIdParamDto = z.object({
-  collaboratorId: z.string().uuid(),
+export const collaboratorUserIdParamDto = z.object({
+  collaboratorUserId: z.string().uuid(),
 });
 
 export const bookingListQueryDto = z.object({

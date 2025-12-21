@@ -52,7 +52,7 @@ router.patch(
 router.post("/:id/collaborators", asyncHandler(BookingController.addCollaborator));
 router.get("/:id/collaborators", asyncHandler(BookingController.listCollaborators));
 router.delete(
-  "/:id/collaborators/:collaboratorId",
+  "/:id/collaborators/:collaboratorUserId",
   asyncHandler(BookingController.removeCollaborator)
 );
 
