@@ -7,7 +7,7 @@ import {
   bookingListQueryDto,
   bookingAdminListQueryDto,
   bookingMyListQueryDto,
-  collaboratorIdParamDto,
+  collaboratorUserIdParamDto,
   createBookingDto,
   updateItineraryDto,
   updateStatusDto,
@@ -41,6 +41,12 @@ export const BookingController = {
       }
       if (error instanceof AppError) {
         throw error;
+      }
+      if (error instanceof Error && error.message === "BOOKING_NOT_FOUND") {
+        throwError(HTTP_STATUS.NOT_FOUND, "Booking not found");
+      }
+      if (error instanceof Error && error.message === "INVALID_STATUS_TRANSITION") {
+        throwError(HTTP_STATUS.CONFLICT, "Invalid booking status transition");
       }
       throwError(
         HTTP_STATUS.INTERNAL_SERVER_ERROR,
@@ -180,7 +186,13 @@ export const BookingController = {
         status as BookingStatus | undefined
       );
 
-      createResponse(res, HTTP_STATUS.OK, "Bookings retrieved", result.items, result.meta);
+      createResponse(
+        res,
+        HTTP_STATUS.OK,
+        "Bookings retrieved",
+        result.items,
+        result.meta
+      );
     } catch (error) {
       if (error instanceof ZodError) {
         throwError(HTTP_STATUS.BAD_REQUEST, "Validation failed", error.errors);
@@ -213,10 +225,13 @@ export const BookingController = {
         status as BookingStatus | undefined
       );
 
-      createResponse(res, HTTP_STATUS.OK, "Shared bookings retrieved", {
-        items: result.items,
-        meta: result.meta,
-      });
+      createResponse(
+        res,
+        HTTP_STATUS.OK,
+        "Shared bookings retrieved",
+        result.items,
+        result.meta
+      );
     } catch (error) {
       if (error instanceof ZodError) {
         throwError(HTTP_STATUS.BAD_REQUEST, "Validation failed", error.errors);
@@ -260,7 +275,13 @@ export const BookingController = {
         page,
         limit
       );
-      createResponse(res, HTTP_STATUS.OK, "Bookings retrieved", result.items, result.meta);
+      createResponse(
+        res,
+        HTTP_STATUS.OK,
+        "Bookings retrieved",
+        result.items,
+        result.meta
+      );
     } catch (error) {
       if (error instanceof ZodError) {
         throwError(HTTP_STATUS.BAD_REQUEST, "Validation failed", error.errors);
@@ -311,10 +332,13 @@ export const BookingController = {
         }
       );
 
-      createResponse(res, HTTP_STATUS.OK, "Payments retrieved", {
-        items: result.items,
-        meta: result.meta,
-      });
+      createResponse(
+        res,
+        HTTP_STATUS.OK,
+        "Payments retrieved",
+        result.items,
+        result.meta
+      );
     } catch (error) {
       if (error instanceof ZodError) {
         throwError(HTTP_STATUS.BAD_REQUEST, "Validation failed", error.errors);
@@ -453,7 +477,12 @@ export const BookingController = {
         collaboratorUserId
       );
 
-      createResponse(res, HTTP_STATUS.CREATED, "Collaborator added", collaborator);
+      createResponse(
+        res,
+        HTTP_STATUS.CREATED,
+        "Collaborator added",
+        collaborator
+      );
     } catch (error: any) {
       if (error instanceof ZodError) {
         throwError(HTTP_STATUS.BAD_REQUEST, "Validation failed", error.errors);
@@ -492,7 +521,12 @@ export const BookingController = {
         authUser.userId
       );
 
-      createResponse(res, HTTP_STATUS.OK, "Collaborators retrieved", collaborators);
+      createResponse(
+        res,
+        HTTP_STATUS.OK,
+        "Collaborators retrieved",
+        collaborators
+      );
     } catch (error: any) {
       if (error instanceof ZodError) {
         throwError(HTTP_STATUS.BAD_REQUEST, "Validation failed", error.errors);
@@ -514,7 +548,7 @@ export const BookingController = {
     }
   },
 
-  // DELETE /api/bookings/:id/collaborators/:collaboratorId
+  // DELETE /api/bookings/:id/collaborators/:collaboratorUserId
   removeCollaborator: async (
     req: AuthenticatedRequest,
     res: Response
@@ -523,12 +557,14 @@ export const BookingController = {
       const authUser = requireAuthUser(req);
 
       const { id } = bookingIdParamDto.parse(req.params);
-      const { collaboratorId } = collaboratorIdParamDto.parse(req.params);
+      const { collaboratorUserId } = collaboratorUserIdParamDto.parse(
+        req.params
+      );
 
       await BookingService.removeCollaborator(
         id,
         authUser.userId,
-        collaboratorId
+        collaboratorUserId
       );
 
       createResponse(res, HTTP_STATUS.OK, "Collaborator removed");

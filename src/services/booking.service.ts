@@ -179,13 +179,40 @@ export const BookingService = {
     actorId?: string
   ) {
     return prisma.$transaction(async (tx) => {
+      const booking = await tx.booking.findUnique({
+        where: { id: bookingId },
+        select: { status: true },
+      });
+
+      if (!booking) {
+        throw new Error("BOOKING_NOT_FOUND");
+      }
+
+      const allowedTransitions: Record<BookingStatus, BookingStatus[]> = {
+        DRAFT: ["PENDING", "CANCELLED"],
+        PENDING: ["CONFIRMED", "REJECTED", "CANCELLED"],
+        CONFIRMED: ["COMPLETED", "CANCELLED"],
+        REJECTED: ["PENDING", "CANCELLED"],
+        COMPLETED: [],
+        CANCELLED: [],
+      };
+
+      if (
+        booking.status !== status &&
+        !allowedTransitions[booking.status].includes(status)
+      ) {
+        throw new Error("INVALID_STATUS_TRANSITION");
+      }
+
       const updated = await tx.booking.update({
         where: { id: bookingId },
         data: {
           status,
           rejectionReason: status === "REJECTED" ? reason : null,
           rejectionResolution: status === "REJECTED" ? resolution : null,
-          isResolved: ["CONFIRMED", "REJECTED", "CANCELLED"].includes(status),
+          isResolved: ["CONFIRMED", "REJECTED", "CANCELLED", "COMPLETED"].includes(
+            status
+          ),
         },
       });
 
@@ -577,7 +604,7 @@ export const BookingService = {
   async removeCollaborator(
     bookingId: string,
     ownerId: string,
-    collaboratorId: string
+    collaboratorUserId: string
   ) {
     return prisma.$transaction(async (tx) => {
       const booking = await tx.booking.findFirst({
@@ -588,7 +615,7 @@ export const BookingService = {
 
       const removed = await tx.bookingCollaborator.deleteMany({
         where: {
-          id: collaboratorId,
+          userId: collaboratorUserId,
           bookingId,
         },
       });
@@ -597,7 +624,7 @@ export const BookingService = {
         tx,
         ownerId,
         "Removed Collaborator",
-        `Removed collaborator ${collaboratorId} from booking ${bookingId}`
+        `Removed collaborator ${collaboratorUserId} from booking ${bookingId}`
       );
 
       return removed;

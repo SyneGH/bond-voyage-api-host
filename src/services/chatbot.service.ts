@@ -25,7 +25,10 @@ export const ChatbotService = {
     const model = process.env.GEMINI_MODEL || "gemini-1.5-flash";
 
     if (!apiKey) {
-      throw new Error("GEMINI_KEY_MISSING");
+      return {
+        fallback: true,
+        message: this.respondRoameo(message),
+      };
     }
 
     const prompt = context ? `${context}\n\nUser: ${message}` : message;

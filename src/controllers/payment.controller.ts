@@ -111,10 +111,13 @@ export const PaymentController = {
         limit
       );
 
-      createResponse(res, HTTP_STATUS.OK, "Payments retrieved", {
-        items: result.items,
-        meta: result.meta,
-      });
+      createResponse(
+        res,
+        HTTP_STATUS.OK,
+        "Payments retrieved",
+        result.items,
+        result.meta
+      );
     } catch (error) {
       if (error instanceof ZodError) {
         throwError(HTTP_STATUS.BAD_REQUEST, "Validation failed", error.errors);
