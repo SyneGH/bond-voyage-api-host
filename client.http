@@ -1,60 +1,458 @@
-@accessToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiIwOWQ1NTVhYS1kZjI0LTQwY2MtYTA5NS00M2FlNjRiZWFhZDYiLCJlbWFpbCI6ImFkbWluQGV4YW1wbGUuY29tIiwicGhvbmVOdW1iZXIiOiIrMTIzNDU2Nzg5MCIsInJvbGUiOiJBRE1JTiIsImlhdCI6MTc2NjIyNjA0NCwiZXhwIjoxNzY2MjI2ODg0fQ.0_Vm-HpO_pJ9Sdmo57Y2Rq-vjX8NkaeASjW4rVJBQp4
-@userToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJmZDAyMjVhNy04YTFkLTQzMDYtOTY1MC03MmIxYTRkNzgxZGUiLCJlbWFpbCI6InVzZXJAZXhhbXBsZS5jb20iLCJwaG9uZU51bWJlciI6IisxMjM0NTY3ODkxIiwicm9sZSI6IlVTRVIiLCJpYXQiOjE3NjYyMDc1NjUsImV4cCI6MTc2NjIwODQwNX0.kpVZsjakVGArhpM1_anWtcZ4wCHKgv_PvtO6wjkGQVM
-@bookingId = 4babba4a-f1c9-47ef-968e-ccf31a07c40a
-@inquiryId = 712c3760-c28e-486e-8a40-ae6c8b218684
-@paymentId = 9f7ca968-680a-4309-b7db-bb031d59ffef
-@feedbackId = 9e8f7d6c-5b4a-4c3d-2e1f-0a9b8c7d6e5f
-@notificationId = 3fa85f64-5717-4562-b3fc-2c963f66afa6
+### ======================================================
+### Bond Voyage API - Unified HTTP Request Samples
+### ======================================================
+### Notes:
+### - Set @baseUrl to local or prod as needed.
+### - Auth flows capture tokens using @name blocks.
+### - Some flows require admin role or env keys.
+### - No webhooks are defined in the API source at this time.
 
-### Auth: Login (ensure data.user.role exists)
-POST http://localhost:8087/api/v1/auth/login
+@localBaseUrl = http://localhost:8087/api/v1
+@prodBaseUrl = https://bond-voyage-api.onrender.com/api/v1
+@baseUrl = {{localBaseUrl}}
+
+@email = user@example.com
+@password = User@123
+@adminEmail = admin@example.com
+@adminPassword = Admin@123
+
+@accessToken =
+@userToken =
+@bookingId =
+@collaboratorId =
+@tourPackageId =
+@paymentId =
+@inquiryId =
+@feedbackId =
+@notificationId =
+
+### ======================================================
+### 1. HEALTH + CORS
+### ======================================================
+### Health check
+# Expected: 200 OK
+GET {{baseUrl}}/health
+
+### CORS preflight (adjust Origin to match CORS_ORIGINS)
+# Expected: 204/200
+OPTIONS {{baseUrl}}/health
+Origin: http://localhost:3000
+Access-Control-Request-Method: GET
+
+### ======================================================
+### 2. AUTHENTICATION
+### ======================================================
+### Register admin
+# Expected: 201 Created
+POST {{baseUrl}}/auth/register
 Content-Type: application/json
 
 {
-  "email": "admin@example.com",
-  "password": "Admin@123"
+  "firstName": "Admin",
+  "lastName": "User",
+  "email": "{{adminEmail}}",
+  "phoneNumber": "+1234567890",
+  "password": "{{adminPassword}}",
+  "role": "ADMIN",
+  "birthday": "2000-01-01"
 }
 
-### Auth: Profile (requires token)
-GET http://localhost:8087/api/v1/auth/profile
+### Register user
+# Expected: 201 Created
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "firstName": "Regular",
+  "lastName": "User",
+  "email": "{{email}}",
+  "phoneNumber": "+1234567891",
+  "password": "{{password}}",
+  "role": "USER",
+  "birthday": "2000-01-02"
+}
+
+### Login as admin
+# Expected: 200 OK (accessToken in data.accessToken)
+# @name adminLogin
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{adminEmail}}",
+  "password": "{{adminPassword}}"
+}
+
+@accessToken = {{adminLogin.response.body.data.accessToken}}
+
+### Login as user
+# Expected: 200 OK (accessToken in data.accessToken)
+# @name userLogin
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{email}}",
+  "password": "{{password}}"
+}
+
+@userToken = {{userLogin.response.body.data.accessToken}}
+
+### Login - Invalid credentials
+# Expected: 401 Unauthorized
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "wrong@email.com",
+  "password": "wrongpassword"
+}
+
+### Login - Missing password
+# Expected: 400 Bad Request
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{adminEmail}}"
+}
+
+### Login - Missing email
+# Expected: 400 Bad Request
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "password": "{{adminPassword}}"
+}
+
+### Refresh token (requires refreshToken cookie from login)
+# Expected: 200 OK
+POST {{baseUrl}}/auth/refresh-token
+
+### Profile
+# Expected: 200 OK
+GET {{baseUrl}}/auth/profile
 Authorization: Bearer {{accessToken}}
 
-### Users: List (admin)
-GET http://localhost:8087/api/v1/users?page=1&limit=10
+### Logout (single device)
+# Expected: 200 OK
+POST {{baseUrl}}/auth/logout
 Authorization: Bearer {{accessToken}}
 
-### Tour Packages: List (public)
-GET http://localhost:8087/api/v1/tour-packages?page=1&limit=10
+### Logout all (all devices)
+# Expected: 200 OK
+POST {{baseUrl}}/auth/logout-all
+Authorization: Bearer {{accessToken}}
 
-### Bookings: Create (user)
-POST http://localhost:8087/api/v1/bookings
+### Send OTP
+# Expected: 200 OK
+POST {{baseUrl}}/auth/send-otp
+Content-Type: application/json
+
+{
+  "email": "{{email}}",
+  "firstName": "Regular"
+}
+
+### Verify OTP
+# Expected: 200 OK (replace otp with real code)
+POST {{baseUrl}}/auth/verify-otp
+Content-Type: application/json
+
+{
+  "email": "{{email}}",
+  "otp": "123456"
+}
+
+### Reset password (requires verified OTP session)
+# Expected: 200 OK
+POST {{baseUrl}}/auth/reset-password
+Content-Type: application/json
+
+{
+  "email": "{{email}}",
+  "newPassword": "NewPassword456!"
+}
+
+### Reset password without OTP
+# Expected: 401 Unauthorized
+POST {{baseUrl}}/auth/reset-password
+Content-Type: application/json
+
+{
+  "email": "{{email}}",
+  "newPassword": "HackerPassword000!"
+}
+
+### ======================================================
+### 3. USERS (ADMIN)
+### ======================================================
+@userId =
+
+### List users (admin)
+# Expected: 200 OK
+# Expected (non-admin): 403 Forbidden
+GET {{baseUrl}}/users?page=1&limit=10
+Authorization: Bearer {{accessToken}}
+
+### Get user (admin)
+# Expected: 200 OK
+# Expected (non-admin): 403 Forbidden
+GET {{baseUrl}}/users/{{userId}}
+Authorization: Bearer {{accessToken}}
+
+### Update user (admin)
+# Expected: 200 OK
+# Expected (non-admin): 403 Forbidden
+PATCH {{baseUrl}}/users/{{userId}}
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "role": "USER",
+  "isActive": true
+}
+
+### Deactivate user (admin)
+# Expected: 200 OK
+# Expected (non-admin): 403 Forbidden
+PATCH {{baseUrl}}/users/{{userId}}/deactivate
+Authorization: Bearer {{accessToken}}
+
+### Delete user (admin)
+# Expected: 200 OK
+# Expected (non-admin): 403 Forbidden
+DELETE {{baseUrl}}/users/{{userId}}
+Authorization: Bearer {{accessToken}}
+
+### Add user (admin)
+# Expected: 201 Created
+# Expected (non-admin): 403 Forbidden
+POST {{baseUrl}}/users
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "firstName": "New",
+  "lastName": "User",
+  "email": "new.user@example.com",
+  "phoneNumber": "+1234567899",
+  "password": "User@123",
+  "role": "USER"
+}
+
+### Update my profile (user)
+# Expected: 200 OK
+PUT {{baseUrl}}/users/profile
 Authorization: Bearer {{userToken}}
 Content-Type: application/json
 
 {
-  "destination": "Cebu",
-  "startDate": "2025-01-10",
-  "endDate": "2025-01-12",
-  "travelers": 2,
-  "totalPrice": 15000,
-  "type": "CUSTOMIZED",
-  "tourType": "PRIVATE",
-  "itinerary": [
+  "firstName": "Updated",
+  "lastName": "User",
+  "phoneNumber": "+1234567891"
+}
+
+### Change my password (user)
+# Expected: 200 OK
+PUT {{baseUrl}}/users/change-password
+Authorization: Bearer {{userToken}}
+Content-Type: application/json
+
+{
+  "currentPassword": "{{password}}",
+  "newPassword": "NewPassword456!"
+}
+
+### ======================================================
+### 4. TOUR PACKAGES
+### ======================================================
+### List tour packages (public)
+# Expected: 200 OK
+GET {{baseUrl}}/tour-packages?page=1&limit=10
+
+### Create tour package (admin)
+# Expected: 201 Created
+POST {{baseUrl}}/tour-packages
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "title": "Baguio Escape",
+  "destination": "Baguio",
+  "category": "City",
+  "description": "2D/1N city escape",
+  "price": 8000,
+  "duration": 2,
+  "thumbUrl": "https://example.com/baguio.jpg",
+  "isActive": true,
+  "days": [
     {
       "dayNumber": 1,
+      "title": "Arrival",
       "activities": [
-        {
-          "time": "09:00",
-          "title": "Arrival",
-          "order": 1
-        }
+        { "time": "09:00", "title": "Check-in", "order": 1 }
       ]
     }
   ]
 }
 
-### Bookings: Add collaborator (owner)
-POST http://localhost:8087/api/v1/bookings/{{bookingId}}/collaborators
+### Get tour package detail (public)
+# Expected: 200 OK
+GET {{baseUrl}}/tour-packages/{{tourPackageId}}
+
+### Update tour package (admin)
+# Expected: 200 OK
+PUT {{baseUrl}}/tour-packages/{{tourPackageId}}
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "title": "Baguio Escape (Updated)",
+  "destination": "Baguio",
+  "category": "City",
+  "description": "2D/1N updated",
+  "price": 9000,
+  "duration": 2,
+  "thumbUrl": "https://example.com/baguio-updated.jpg",
+  "isActive": true,
+  "days": [
+    {
+      "dayNumber": 1,
+      "title": "Arrival",
+      "activities": [
+        { "time": "09:00", "title": "Check-in", "order": 1 }
+      ]
+    }
+  ]
+}
+
+### Delete tour package (admin)
+# Expected: 200 OK
+DELETE {{baseUrl}}/tour-packages/{{tourPackageId}}
+Authorization: Bearer {{accessToken}}
+
+### ======================================================
+### 5. BOOKINGS (USER + ADMIN)
+### ======================================================
+### Create booking (user)
+# Expected: 201 Created
+# @name createBooking
+POST {{baseUrl}}/bookings
+Authorization: Bearer {{userToken}}
+Content-Type: application/json
+
+{
+  "destination": "El Nido, Palawan",
+  "startDate": "2024-06-01T00:00:00.000Z",
+  "endDate": "2024-06-03T00:00:00.000Z",
+  "travelers": 2,
+  "totalPrice": 25000,
+  "type": "CUSTOMIZED",
+  "tourType": "PRIVATE",
+  "itinerary": [
+    {
+      "dayNumber": 1,
+      "date": "2024-06-01T00:00:00.000Z",
+      "activities": [
+        { "time": "08:00 AM", "title": "Airport Pickup", "order": 1 }
+      ]
+    }
+  ]
+}
+
+@bookingId = {{createBooking.response.body.data.id}}
+
+### List my bookings (user)
+# Expected: 200 OK
+GET {{baseUrl}}/bookings/my-bookings?page=1&limit=10
+Authorization: Bearer {{userToken}}
+
+### Get booking detail (user)
+# Expected: 200 OK
+GET {{baseUrl}}/bookings/{{bookingId}}
+Authorization: Bearer {{userToken}}
+
+### Update booking itinerary (user)
+# Expected: 200 OK
+PUT {{baseUrl}}/bookings/{{bookingId}}
+Authorization: Bearer {{userToken}}
+Content-Type: application/json
+
+{
+  "destination": "Coron, Palawan",
+  "startDate": "2024-06-10T00:00:00.000Z",
+  "endDate": "2024-06-12T00:00:00.000Z",
+  "travelers": 3,
+  "totalPrice": 30000,
+  "itinerary": [
+    {
+      "dayNumber": 1,
+      "date": "2024-06-10T00:00:00.000Z",
+      "activities": [
+        { "time": "09:00 AM", "title": "Island Hopping", "order": 1 }
+      ]
+    }
+  ]
+}
+
+### Submit booking (user)
+# Expected: 200 OK (DRAFT -> PENDING)
+PATCH {{baseUrl}}/bookings/{{bookingId}}/submit
+Authorization: Bearer {{userToken}}
+
+### Cancel booking (user)
+# Expected: 200 OK
+PATCH {{baseUrl}}/bookings/{{bookingId}}/cancel
+Authorization: Bearer {{userToken}}
+
+### Delete draft booking (user, only DRAFT)
+# Expected: 200 OK
+DELETE {{baseUrl}}/bookings/{{bookingId}}
+Authorization: Bearer {{userToken}}
+
+### Shared with me (collaborator)
+# Expected: 200 OK
+GET {{baseUrl}}/bookings/shared-with-me?page=1&limit=10
+Authorization: Bearer {{userToken}}
+
+### Admin: list all bookings
+# Expected: 200 OK
+# Expected (non-admin): 403 Forbidden
+GET {{baseUrl}}/bookings/admin/bookings?page=1&limit=10&status=PENDING
+Authorization: Bearer {{accessToken}}
+
+### Admin: reject booking
+# Expected: 200 OK
+# Expected (non-admin): 403 Forbidden
+PATCH {{baseUrl}}/bookings/{{bookingId}}/status
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "status": "REJECTED",
+  "rejectionReason": "Dates fully booked",
+  "rejectionResolution": "Select dates after June 10"
+}
+
+### Admin: approve booking
+# Expected: 200 OK
+# Expected (non-admin): 403 Forbidden
+PATCH {{baseUrl}}/bookings/{{bookingId}}/status
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "status": "CONFIRMED"
+}
+
+### ======================================================
+### 6. COLLABORATORS
+### ======================================================
+### Add collaborator (owner)
+# Expected: 201 Created
+POST {{baseUrl}}/bookings/{{bookingId}}/collaborators
 Authorization: Bearer {{userToken}}
 Content-Type: application/json
 
@@ -62,135 +460,23 @@ Content-Type: application/json
   "email": "collab@example.com"
 }
 
-### Bookings: List collaborators (owner or collaborator)
-GET http://localhost:8087/api/v1/bookings/{{bookingId}}/collaborators
+### List collaborators (owner or collaborator)
+# Expected: 200 OK
+GET {{baseUrl}}/bookings/{{bookingId}}/collaborators
 Authorization: Bearer {{userToken}}
 
-### Bookings: Shared with me (collaborator)
-GET http://localhost:8087/api/v1/bookings/shared-with-me?page=1&limit=10
+### Remove collaborator (owner)
+# Expected: 200 OK
+DELETE {{baseUrl}}/bookings/{{bookingId}}/collaborators/{{collaboratorId}}
 Authorization: Bearer {{userToken}}
 
-### Bookings: Payments list (owner/admin)
-GET http://localhost:8087/api/v1/bookings/{{bookingId}}/payments?page=1&limit=10&status=PENDING
-Authorization: Bearer {{accessToken}}
-
-### Payments: List (admin)
-GET http://localhost:8087/api/v1/payments?page=1&limit=10&status=PENDING&bookingId={{bookingId}}
-Authorization: Bearer {{accessToken}}
-
-### Payments: Verify (admin)
-PATCH http://localhost:8087/api/v1/payments/{{paymentId}}/status
-Authorization: Bearer {{accessToken}}
-Content-Type: application/json
-
-{
-  "status": "VERIFIED"
-}
-
-### Payments: Proof download (owner/admin)
-# Expected response: raw bytes with Content-Type = proofMimeType (or application/octet-stream)
-GET http://localhost:8087/api/v1/payments/{{paymentId}}/proof
-Authorization: Bearer {{accessToken}}
-
-### Inquiries: Create (user)
-POST http://localhost:8087/api/v1/inquiries
-Authorization: Bearer {{userToken}}
-Content-Type: application/json
-
-{
-  "subject": "Visa Requirements",
-  "message": "Do we need a visa?"
-}
-
-### Inquiries: Add message (admin)
-POST http://localhost:8087/api/v1/inquiries/{{inquiryId}}/messages
-Authorization: Bearer {{accessToken}}
-Content-Type: application/json
-
-{
-  "content": "Please share your nationality."
-}
-
-### Feedback: Create (user)
-POST http://localhost:8087/api/v1/feedback
-Authorization: Bearer {{userToken}}
-Content-Type: application/json
-
-{
-  "rating": 5,
-  "comment": "Great service!"
-}
-
-### Feedback: Respond (admin)
-PATCH http://localhost:8087/api/v1/feedback/{{feedbackId}}/respond
-Authorization: Bearer {{accessToken}}
-Content-Type: application/json
-
-{
-  "response": "Thanks for your feedback!"
-}
-
-### Activity Logs: List (admin)
-GET http://localhost:8087/api/v1/activity-logs?page=1&limit=10
-Authorization: Bearer {{accessToken}}
-
-### Notifications: List (user)
-GET http://localhost:8087/api/v1/notifications
-Authorization: Bearer {{userToken}}
-
-### Notifications: Mark read
-PATCH http://localhost:8087/api/v1/notifications/{{notificationId}}/read
-Authorization: Bearer {{userToken}}
-
-### Weather: Lookup (requires OPENWEATHER_API_KEY)
-GET http://localhost:8087/api/v1/weather?lat=14.5995&lng=120.9842
-
-### Weather: Forecast (returns mock if OPENWEATHER_API_KEY missing)
-GET http://localhost:8087/api/v1/weather/forecast?lat=14.5995&lng=120.9842
-
-### Bookings: Submit (user, allows resubmitting rejected)
-POST http://localhost:8087/api/v1/bookings/{{bookingId}}/submit
-Authorization: Bearer {{userToken}}
-
-### Route Optimization: uses GEOAPIFY_API_KEY or fallback
-POST http://localhost:8087/api/v1/routes/optimize
-Content-Type: application/json
-
-{
-  "origin": { "lat": 14.5995, "lng": 120.9842 },
-  "destination": { "lat": 16.4023, "lng": 120.5960 },
-  "waypoints": [{ "lat": 15.0, "lng": 120.5 }]
-}
-
-### Chatbots: Roameo (static)
-POST http://localhost:8087/api/v1/chatbots/roameo
-Content-Type: application/json
-
-{
-  "message": "How do I add collaborators?"
-}
-
-### Chatbots: Roaman (requires GEMINI_API_KEY)
-POST http://localhost:8087/api/v1/chatbots/roaman
-Content-Type: application/json
-
-{
-  "message": "Build a 3-day Palawan itinerary.",
-  "context": "User prefers beaches and light activities."
-}
-
-### Smart Trip: Generate itinerary (stub)
-POST http://localhost:8087/api/v1/ai/itinerary
-Content-Type: application/json
-
-{
-  "destination": "Palawan",
-  "startDate": "2025-01-10",
-  "endDate": "2025-01-12"
-}
-
-### Payments: Submit proof (user)
-POST http://localhost:8087/api/v1/bookings/{{bookingId}}/payments
+### ======================================================
+### 7. PAYMENTS
+### ======================================================
+### Submit payment proof (user)
+# Expected: 201 Created
+# @name submitPayment
+POST {{baseUrl}}/bookings/{{bookingId}}/payments
 Authorization: Bearer {{userToken}}
 Content-Type: application/json
 
@@ -203,5 +489,191 @@ Content-Type: application/json
   "transactionId": "TXN-10001"
 }
 
-###
-GET http://localhost:8087/api/v1/health
+@paymentId = {{submitPayment.response.body.data.id}}
+
+### List payments (admin)
+# Expected: 200 OK
+# Expected (non-admin): 403 Forbidden
+GET {{baseUrl}}/payments?page=1&limit=10&status=PENDING&bookingId={{bookingId}}
+Authorization: Bearer {{accessToken}}
+
+### Booking payments list (owner/admin)
+# Expected: 200 OK
+GET {{baseUrl}}/bookings/{{bookingId}}/payments?page=1&limit=10&status=PENDING
+Authorization: Bearer {{accessToken}}
+
+### Verify payment (admin)
+# Expected: 200 OK
+# Expected (non-admin): 403 Forbidden
+PATCH {{baseUrl}}/payments/{{paymentId}}/status
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "status": "VERIFIED"
+}
+
+### Download payment proof (owner/admin)
+# Expected: raw bytes (Content-Type = proofMimeType or application/octet-stream)
+GET {{baseUrl}}/payments/{{paymentId}}/proof
+Authorization: Bearer {{accessToken}}
+
+### ======================================================
+### 8. INQUIRIES + MESSAGES
+### ======================================================
+### Create inquiry (user)
+# Expected: 201 Created
+# @name createInquiry
+POST {{baseUrl}}/inquiries
+Authorization: Bearer {{userToken}}
+Content-Type: application/json
+
+{
+  "subject": "Visa Requirements",
+  "message": "Do we need a visa?"
+}
+
+@inquiryId = {{createInquiry.response.body.data.id}}
+
+### List inquiries (admin)
+# Expected: 200 OK
+# Expected (non-admin): 403 Forbidden
+GET {{baseUrl}}/inquiries
+Authorization: Bearer {{accessToken}}
+
+### Add message (admin)
+# Expected: 201 Created
+# Expected (non-admin): 403 Forbidden
+POST {{baseUrl}}/inquiries/{{inquiryId}}/messages
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "content": "Please share your nationality."
+}
+
+### ======================================================
+### 9. FEEDBACK
+### ======================================================
+### Submit feedback (user)
+# Expected: 201 Created
+# @name createFeedback
+POST {{baseUrl}}/feedback
+Authorization: Bearer {{userToken}}
+Content-Type: application/json
+
+{
+  "rating": 5,
+  "comment": "Great service!"
+}
+
+@feedbackId = {{createFeedback.response.body.data.id}}
+
+### List feedback (admin)
+# Expected: 200 OK
+# Expected (non-admin): 403 Forbidden
+GET {{baseUrl}}/feedback
+Authorization: Bearer {{accessToken}}
+
+### Respond to feedback (admin)
+# Expected: 200 OK
+# Expected (non-admin): 403 Forbidden
+PATCH {{baseUrl}}/feedback/{{feedbackId}}/respond
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "response": "Thanks for your feedback!"
+}
+
+### ======================================================
+### 10. ACTIVITY LOGS
+### ======================================================
+### List activity logs (admin)
+# Expected: 200 OK
+# Expected (non-admin): 403 Forbidden
+GET {{baseUrl}}/activity-logs?page=1&limit=10
+Authorization: Bearer {{accessToken}}
+
+### ======================================================
+### 11. NOTIFICATIONS
+### ======================================================
+### List notifications (user)
+# Expected: 200 OK
+GET {{baseUrl}}/notifications
+Authorization: Bearer {{userToken}}
+
+### Mark notification as read (user)
+# Expected: 200 OK
+PATCH {{baseUrl}}/notifications/{{notificationId}}/read
+Authorization: Bearer {{userToken}}
+
+### ======================================================
+### 12. WEATHER
+### ======================================================
+### Weather lookup (requires OPENWEATHER_API_KEY)
+# Expected: 200 OK
+GET {{baseUrl}}/weather?lat=14.5995&lng=120.9842
+
+### Weather forecast (returns mock if OPENWEATHER_API_KEY missing)
+# Expected: 200 OK
+GET {{baseUrl}}/weather/forecast?lat=14.5995&lng=120.9842
+
+### ======================================================
+### 13. ROUTE OPTIMIZATION
+### ======================================================
+### Optimize route (requires GEOAPIFY_API_KEY or fallback)
+# Expected: 200 OK
+POST {{baseUrl}}/routes/optimize
+Content-Type: application/json
+
+{
+  "origin": { "lat": 14.5995, "lng": 120.9842 },
+  "destination": { "lat": 16.4023, "lng": 120.5960 },
+  "waypoints": [{ "lat": 15.0, "lng": 120.5 }]
+}
+
+### ======================================================
+### 14. CHATBOTS
+### ======================================================
+### Roameo (static)
+# Expected: 200 OK
+POST {{baseUrl}}/chatbots/roameo
+Content-Type: application/json
+
+{
+  "message": "How do I add collaborators?"
+}
+
+### Roaman (requires GEMINI_API_KEY)
+# Expected: 200 OK
+POST {{baseUrl}}/chatbots/roaman
+Content-Type: application/json
+
+{
+  "message": "Build a 3-day Palawan itinerary.",
+  "context": "User prefers beaches and light activities."
+}
+
+### ======================================================
+### 15. AI ITINERARY
+### ======================================================
+### Generate AI itinerary (stub)
+# Expected: 200 OK
+POST {{baseUrl}}/ai/itinerary
+Content-Type: application/json
+
+{
+  "destination": "Palawan",
+  "startDate": "2025-01-10",
+  "endDate": "2025-01-12"
+}
+
+### ======================================================
+### 16. DASHBOARD (ADMIN)
+### ======================================================
+### Admin stats
+# Expected: 200 OK
+# Expected (non-admin): 403 Forbidden
+GET {{baseUrl}}/dashboard/stats
+Authorization: Bearer {{accessToken}}
