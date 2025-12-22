@@ -93,6 +93,41 @@ async function main() {
   await prisma.activityLog.deleteMany({});
   await prisma.booking.deleteMany({});
   await prisma.tourPackage.deleteMany({});
+  await prisma.location.deleteMany({});
+
+  const locations = await prisma.location.createMany({
+    data: [
+      {
+        name: "Boracay",
+        alias: ["boracay", "white beach", "boracay island"],
+        latitude: 11.9674,
+        longitude: 121.9248,
+        imageUrl: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e",
+        description: "BondVoyage verified destination known for powdery white sand.",
+        isActive: true,
+      },
+      {
+        name: "El Nido",
+        alias: ["el nido", "palawan el nido", "elnido"],
+        latitude: 11.2026,
+        longitude: 119.4168,
+        imageUrl: "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee",
+        description: "BondVoyage verified destination with lagoons and limestone cliffs.",
+        isActive: true,
+      },
+      {
+        name: "Baguio",
+        alias: ["baguio", "baguio city", "summer capital"],
+        latitude: 16.4023,
+        longitude: 120.596,
+        imageUrl: "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee",
+        description: "BondVoyage verified destination known for cool climate and pine trees.",
+        isActive: true,
+      },
+    ],
+  });
+
+  console.log("✅ Seeded Locations:", locations.count);
 
   const tourPackage1 = await prisma.tourPackage.create({
     data: {

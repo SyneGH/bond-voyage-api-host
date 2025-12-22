@@ -1,41 +1,68 @@
 import { Request, Response } from "express";
-import axios from "axios";
 import { ZodError } from "zod";
 import { optimizeRouteDto } from "@/validators/route.dto";
 import { AppError, createResponse, throwError } from "@/utils/responseHandler";
 import { HTTP_STATUS } from "@/constants/constants";
+import { GeoapifyService } from "@/services/geoapify.service";
+
+const MAX_MATRIX_POINTS = 25;
 
 export const RouteController = {
   optimize: async (req: Request, res: Response): Promise<void> => {
     try {
       const payload = optimizeRouteDto.parse(req.body);
-      const apiKey = process.env.GEOAPIFY_API_KEY;
+      const activities = payload.activities;
+      const mode = payload.mode ?? "drive";
 
-      const points = [
-        payload.origin,
-        ...(payload.waypoints ?? []),
-        payload.destination,
-      ];
-      const waypoints = points.map((point) => `${point.lat},${point.lng}`).join("|");
-
-      if (!apiKey) {
-        const fallback = buildFallbackRoute(points);
-        createResponse(res, HTTP_STATUS.OK, "Route optimized", fallback);
-        return;
+      if (activities.length > MAX_MATRIX_POINTS) {
+        throwError(
+          HTTP_STATUS.BAD_REQUEST,
+          `Too many activities. Maximum allowed is ${MAX_MATRIX_POINTS}.`
+        );
       }
 
-      const response = await axios.get(
-        "https://api.geoapify.com/v1/routing",
-        {
-          params: {
-            waypoints,
-            mode: "drive",
-            apiKey,
-          },
-        }
+      const matrix = await GeoapifyService.routeMatrix(activities, mode);
+      const order = buildNearestNeighborOrder(matrix.times);
+      const optimizedActivities = order.map((index) => activities[index]);
+
+      const totalsFromMatrix = sumTotalsFromMatrix(
+        order,
+        matrix.distances,
+        matrix.times
       );
 
-      createResponse(res, HTTP_STATUS.OK, "Route optimized", response.data);
+      const routingResponse = await GeoapifyService.route(
+        optimizedActivities,
+        mode
+      );
+
+      const routingFeature = (routingResponse as any)?.features?.[0];
+      const routeGeometry = routingFeature?.geometry;
+      const routeProps = routingFeature?.properties;
+
+      if (!routeGeometry) {
+        throwError(
+          HTTP_STATUS.BAD_GATEWAY,
+          "Geoapify routing response missing geometry"
+        );
+      }
+
+      const totalDistance =
+        typeof routeProps?.distance === "number"
+          ? routeProps.distance
+          : totalsFromMatrix.totalDistance;
+      const totalTime =
+        typeof routeProps?.time === "number"
+          ? routeProps.time
+          : totalsFromMatrix.totalTime;
+
+      createResponse(res, HTTP_STATUS.OK, "Route optimized", {
+        optimizedActivities,
+        routeGeometry,
+        totalDistance,
+        totalTime,
+        matrixSummary: totalsFromMatrix,
+      });
     } catch (error) {
       if (error instanceof ZodError) {
         throwError(HTTP_STATUS.BAD_REQUEST, "Validation failed", error.errors);
@@ -48,37 +75,63 @@ export const RouteController = {
   },
 };
 
-const buildFallbackRoute = (points: { lat: number; lng: number }[]) => {
-  const distanceMeters = points.reduce((total, point, index) => {
-    if (index === 0) return total;
-    return total + haversineDistance(points[index - 1], point);
-  }, 0);
+const buildNearestNeighborOrder = (
+  times: Array<Array<number | null>>
+): number[] => {
+  const total = times.length;
+  if (total === 0) {
+    return [];
+  }
 
-  const averageSpeedMetersPerSecond = 16.67; // ~60 km/h
-  const durationSeconds = Math.round(distanceMeters / averageSpeedMetersPerSecond);
+  const remaining = new Set<number>();
+  for (let i = 1; i < total; i += 1) {
+    remaining.add(i);
+  }
 
-  return {
-    mode: "drive",
-    distanceMeters,
-    durationSeconds,
-    points,
-  };
+  const order = [0];
+  while (remaining.size > 0) {
+    const current = order[order.length - 1];
+    let nextIndex: number | null = null;
+    let bestTime = Number.POSITIVE_INFINITY;
+
+    remaining.forEach((candidate) => {
+      const time = times[current]?.[candidate];
+      if (typeof time === "number" && time < bestTime) {
+        bestTime = time;
+        nextIndex = candidate;
+      }
+    });
+
+    if (nextIndex === null) {
+      nextIndex = remaining.values().next().value;
+    }
+
+    remaining.delete(nextIndex);
+    order.push(nextIndex);
+  }
+
+  return order;
 };
 
-const haversineDistance = (
-  start: { lat: number; lng: number },
-  end: { lat: number; lng: number }
+const sumTotalsFromMatrix = (
+  order: number[],
+  distances: Array<Array<number | null>>,
+  times: Array<Array<number | null>>
 ) => {
-  const toRadians = (value: number) => (value * Math.PI) / 180;
-  const earthRadiusMeters = 6371000;
-  const dLat = toRadians(end.lat - start.lat);
-  const dLng = toRadians(end.lng - start.lng);
-  const lat1 = toRadians(start.lat);
-  const lat2 = toRadians(end.lat);
-
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return earthRadiusMeters * c;
+  return order.reduce(
+    (totals, index, position) => {
+      if (position === 0) {
+        return totals;
+      }
+      const prevIndex = order[position - 1];
+      const distance = distances[prevIndex]?.[index];
+      const time = times[prevIndex]?.[index];
+      return {
+        totalDistance:
+          totals.totalDistance + (typeof distance === "number" ? distance : 0),
+        totalTime: totals.totalTime + (typeof time === "number" ? time : 0),
+      };
+    },
+    { totalDistance: 0, totalTime: 0 }
+  );
 };
