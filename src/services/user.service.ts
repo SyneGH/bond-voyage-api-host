@@ -18,9 +18,9 @@ export class UserService {
     });
   }
 
-  async findByPhoneNumber(phoneNumber: string): Promise<User | null> {
+  async findBymobile(mobile: string): Promise<User | null> {
     return prisma.user.findUnique({
-      where: { phoneNumber },
+      where: { mobile },
     });
   }
 
@@ -44,7 +44,7 @@ export class UserService {
       lastName: data.lastName,
       email: data.email,
       employeeId: data.employeeId || `EMP${Date.now()}`,
-      phoneNumber: data.phoneNumber,
+      mobile: data.mobile,
       password: hashedPassword,
     };
 

@@ -21,7 +21,7 @@ export const registerDto = z.object({
     .max(UserEnum.LAST_NAME_MAX),
   email: z.string().email().regex(Regex.EMAIL_PATTERN),
   employeeId: z.string().optional().or(z.literal("")),
-  phoneNumber: z.string().regex(phoneRegex),
+  mobile: z.string().regex(phoneRegex),
   birthday: z.string().optional().or(z.literal("")),
   password: z.string().min(8),
   role: z.enum(["ADMIN", "USER"]).optional(),

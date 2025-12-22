@@ -11,7 +11,7 @@ interface RegisterInput {
   firstName: string;
   middleName?: string | null;
   lastName: string;
-  phoneNumber: string;
+  mobile: string;
   birthday?: string | null;
   role?: "ADMIN" | "USER";
   companyName?: string | null;
@@ -23,7 +23,7 @@ export class AuthService {
   ): Promise<{ user: User; accessToken: string; refreshToken: string }> {
     const existingUser = await prisma.user.findFirst({
       where: {
-        OR: [{ email: data.email }, { phoneNumber: data.phoneNumber }],
+        OR: [{ email: data.email }, { mobile: data.mobile }],
       },
     });
 
@@ -45,7 +45,7 @@ export class AuthService {
         firstName: data.firstName,
         middleName: data.middleName || undefined,
         lastName: data.lastName,
-        phoneNumber: data.phoneNumber,
+        mobile: data.mobile,
         birthday: data.birthday ? new Date(data.birthday) : undefined,
         role: userRole,
         companyName: userRole === UserRole.ADMIN ? data.companyName : null,
@@ -56,7 +56,7 @@ export class AuthService {
     const tokenPayload = {
       userId: user.id,
       email: user.email,
-      phoneNumber: user.phoneNumber,
+      mobile: user.mobile,
       role: user.role,
     };
 
@@ -108,7 +108,7 @@ export class AuthService {
     const tokenPayload = {
       userId: authUser.id,
       email: authUser.email,
-      phoneNumber: authUser.phoneNumber,
+      mobile: authUser.mobile,
       role: authUser.role,
     };
 
@@ -147,7 +147,7 @@ export class AuthService {
     const tokenPayload = {
       userId: authUser.id,
       email: authUser.email,
-      phoneNumber: authUser.phoneNumber,
+      mobile: authUser.mobile,
       role: authUser.role,
     };
 

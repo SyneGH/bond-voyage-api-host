@@ -8,11 +8,11 @@
 ### - No webhooks are defined in the API source at this time.
 
 @localBaseUrl = http://localhost:8087/api/v1
-@prodBaseUrl = https://bond-voyage-api.onrender.com/api/v1
-@baseUrl = {{localBaseUrl}}
+@prodBaseUrl = https://bond-voyage-api-host.onrender.com/api/v1
+@baseUrl = {{prodBaseUrl}}
 
-@email = user@example.com
-@password = User@123
+@email = felixangelomelgar5@gmail.com
+@password = Felix@123
 @adminEmail = admin@example.com
 @adminPassword = Admin@123
 
@@ -36,7 +36,7 @@ GET {{baseUrl}}/health
 ### CORS preflight (adjust Origin to match CORS_ORIGINS)
 # Expected: 204/200
 OPTIONS {{baseUrl}}/health
-Origin: http://localhost:3000
+Origin: https://localhost:3000
 Access-Control-Request-Method: GET
 
 ### ======================================================
@@ -51,7 +51,7 @@ Content-Type: application/json
   "firstName": "Admin",
   "lastName": "User",
   "email": "{{adminEmail}}",
-  "phoneNumber": "+1234567890",
+  "mobile": "09987654321",
   "password": "{{adminPassword}}",
   "role": "ADMIN",
   "birthday": "2000-01-01"
@@ -63,13 +63,13 @@ POST {{baseUrl}}/auth/register
 Content-Type: application/json
 
 {
-  "firstName": "Regular",
-  "lastName": "User",
+  "firstName": "Felix",
+  "lastName": "Melgar",
   "email": "{{email}}",
-  "phoneNumber": "+1234567891",
+  "mobile": "09612133520",
   "password": "{{password}}",
   "role": "USER",
-  "birthday": "2000-01-02"
+  "birthday": "2004-05-05"
 }
 
 ### Login as admin
@@ -83,6 +83,7 @@ Content-Type: application/json
   "password": "{{adminPassword}}"
 }
 
+###
 @accessToken = {{adminLogin.response.body.data.accessToken}}
 
 ### Login as user
@@ -96,6 +97,7 @@ Content-Type: application/json
   "password": "{{password}}"
 }
 
+###
 @userToken = {{userLogin.response.body.data.accessToken}}
 
 ### Login - Invalid credentials
@@ -133,7 +135,7 @@ POST {{baseUrl}}/auth/refresh-token
 ### Profile
 # Expected: 200 OK
 GET {{baseUrl}}/auth/profile
-Authorization: Bearer {{accessToken}}
+Authorization: Bearer {{userToken}}
 
 ### Logout (single device)
 # Expected: 200 OK
@@ -152,7 +154,7 @@ Content-Type: application/json
 
 {
   "email": "{{email}}",
-  "firstName": "Regular"
+  "firstName": "Felix"
 }
 
 ### Verify OTP
@@ -162,7 +164,7 @@ Content-Type: application/json
 
 {
   "email": "{{email}}",
-  "otp": "123456"
+  "otp": "216844"
 }
 
 ### Reset password (requires verified OTP session)
@@ -237,7 +239,7 @@ Content-Type: application/json
   "firstName": "New",
   "lastName": "User",
   "email": "new.user@example.com",
-  "phoneNumber": "+1234567899",
+  "mobile": "+1234567899",
   "password": "User@123",
   "role": "USER"
 }
@@ -251,7 +253,7 @@ Content-Type: application/json
 {
   "firstName": "Updated",
   "lastName": "User",
-  "phoneNumber": "+1234567891"
+  "mobile": "+1234567891"
 }
 
 ### Change my password (user)

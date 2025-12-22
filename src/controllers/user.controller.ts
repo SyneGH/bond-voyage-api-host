@@ -70,7 +70,7 @@ class UserController {
           payload.employeeId
             ? userService.findByEmployeeId(payload.employeeId)
             : Promise.resolve(null),
-          userService.findByPhoneNumber(payload.phoneNumber),
+          userService.findBymobile(payload.mobile),
         ]);
 
       if (existingEmailUser || existingEmployeeUser || existingPhoneUser) {

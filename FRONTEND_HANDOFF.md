@@ -314,7 +314,7 @@ Content-Type: application/json
   "firstName": "Jane",
   "lastName": "Doe",
   "email": "jane@example.com",
-  "phoneNumber": "09171234567",
+  "mobile": "09171234567",
   "password": "Password@123",
   "employeeId": "EMP100",
   "birthday": "1995-01-01",
@@ -333,7 +333,7 @@ Content-Type: application/json
       "email": "jane@example.com",
       "firstName": "Jane",
       "lastName": "Doe",
-      "phoneNumber": "09171234567",
+      "mobile": "09171234567",
       "role": "USER",
       "companyName": null
     },
@@ -371,7 +371,7 @@ Content-Type: application/json
       "email": "jane@example.com",
       "firstName": "Jane",
       "lastName": "Doe",
-      "phoneNumber": "09171234567",
+      "mobile": "09171234567",
       "role": "USER",
       "avatarUrl": null,
       "companyName": null,
@@ -399,7 +399,7 @@ Authorization: Bearer <jwt>
       "email": "jane@example.com",
       "firstName": "Jane",
       "lastName": "Doe",
-      "phoneNumber": "09171234567",
+      "mobile": "09171234567",
       "role": "USER"
     }
   }

@@ -22,7 +22,7 @@
   "middleName": "Michael",  // Optional
   "lastName": "Doe",
   "email": "john.doe@example.com",
-  "phoneNumber": "+1234567890",
+  "mobile": "+1234567890",
   "password": "SecurePass123!",
   "role": "USER",  // Optional, defaults to "USER", can be "ADMIN"
   "birthday": "1990-01-15",
@@ -41,7 +41,7 @@
       "firstName": "John",
       "middleName": "Michael",
       "lastName": "Doe",
-      "phoneNumber": "+1234567890",
+      "mobile": "+1234567890",
       "employeeId": "EMP001",
       "birthday": "1990-01-15T00:00:00.000Z",
       "email": "john.doe@example.com",
@@ -79,7 +79,7 @@
 - Phone number must be valid format (E.164 recommended)
 - Email must be unique
 - EmployeeId must be unique
-- PhoneNumber must be unique
+- mobile must be unique
 - `refreshToken` cookie is automatically set (httpOnly, secure)
 
 ---
@@ -107,7 +107,7 @@
       "firstName": "Admin",
       "middleName": null,
       "lastName": "User",
-      "phoneNumber": "+1234567890",
+      "mobile": "+1234567890",
       "employeeId": "00002616",
       "birthday": null,
       "email": "admin@example.com",
@@ -310,7 +310,7 @@ Authorization: Bearer {accessToken}
       "firstName": "Admin",
       "middleName": null,
       "lastName": "User",
-      "phoneNumber": "+1234567890",
+      "mobile": "+1234567890",
       "employeeId": "00002616",
       "birthday": null,
       "email": "admin@example.com",

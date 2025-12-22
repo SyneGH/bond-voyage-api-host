@@ -7,7 +7,7 @@ CREATE TABLE "users" (
     "firstName" VARCHAR(50) NOT NULL,
     "middleName" VARCHAR(50),
     "lastName" VARCHAR(50) NOT NULL,
-    "phoneNumber" VARCHAR(20) NOT NULL,
+    "mobile" VARCHAR(20) NOT NULL,
     "employeeId" VARCHAR(8) NOT NULL,
     "email" VARCHAR(255) NOT NULL,
     "password" VARCHAR(255) NOT NULL,
@@ -22,7 +22,7 @@ CREATE TABLE "users" (
 );
 
 -- CreateIndex
-CREATE UNIQUE INDEX "users_phoneNumber_key" ON "users"("phoneNumber");
+CREATE UNIQUE INDEX "users_mobile_key" ON "users"("mobile");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "users_employeeId_key" ON "users"("employeeId");

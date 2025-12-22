@@ -163,7 +163,7 @@ curl -X POST http://localhost:8087/api/v1/auth/register \
     "lastName": "Doe",
     "email": "john@example.com",
     "employeeId": "EMP001",
-    "phoneNumber": "+1234567890",
+    "mobile": "+1234567890",
     "password": "Password@123"
   }'
 ```

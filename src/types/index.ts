@@ -11,7 +11,7 @@ export interface ApiResponse<T = any, M = any> {
 export interface TokenPayload {
   userId: string;
   email: string;
-  phoneNumber: string;
+  mobile: string;
   role: string;
   iat?: number;
   exp?: number;
@@ -29,7 +29,7 @@ export interface RegisterDto {
   firstName: string;
   middleName?: string;
   lastName: string;
-  phoneNumber: string;
+  mobile: string;
   birthday?: string;
   employeeId?: string;
   email: string;

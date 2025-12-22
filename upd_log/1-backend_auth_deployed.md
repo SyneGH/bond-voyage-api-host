@@ -14,7 +14,7 @@ Login, Sign up, and Forgot/Reset Password Authentication with OTP ✅
 
     Sign Up: POST /auth/register
 
-        Payload: { "email": "...", "password": "...", "firstName": "...", "lastName": "...", "phoneNumber": "..." }
+        Payload: { "email": "...", "password": "...", "firstName": "...", "lastName": "...", "mobile": "..." }
 
     Login: POST /auth/login
 

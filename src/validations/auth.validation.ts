@@ -22,7 +22,7 @@ export const registerSchema = Joi.object({
 
   employeeId: Joi.string().optional().allow(''), // Optional, can be empty
 
-  phoneNumber: Joi.string()
+  mobile: Joi.string()
     .pattern(/^0?9\d{9}$/) // Accepts 09XXXXXXXXX or 9XXXXXXXXX
     .required()
     .messages({

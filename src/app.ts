@@ -17,17 +17,31 @@ app.use(helmet());
 const corsOrigins = resolveCorsOrigins();
 
 // CORS configuration
+const allowedOrigins = (process.env.CORS_ORIGINS || "")
+  .split(",")
+  .map((origin) => origin.trim()) 
+  .filter((origin) => origin.length > 0);
+
+// Log valid origins on startup so you can verify them immediately
+console.log("✅ CORS Allowed Origins:", allowedOrigins);
+
 app.use(
   cors({
     origin: (origin, callback) => {
+      // 2. ALLOW SERVER-TO-SERVER: Allow requests with no origin 
+      // (like Postman, mobile apps, or curl requests)
       if (!origin) {
-        callback(null, true);
-        return;
+        return callback(null, true);
       }
 
-      const isAllowed =
-        corsOrigins.includes("*") || corsOrigins.includes(origin);
-      callback(null, isAllowed);
+      // 3. CHECK ORIGIN
+      if (allowedOrigins.includes("*") || allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      } else {
+        // 4. LOUD FAILURE: Log exactly what was blocked to the server console
+        console.error(`❌ CORS BLOCKED: Request from origin '${origin}' is not allowed.`);
+        return callback(new Error(`CORS not allowed for origin: ${origin}`));
+      }
     },
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],

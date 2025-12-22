@@ -86,7 +86,7 @@ model User {
   lastName      String?   @db.VarChar(50)
   birthday      DateTime?
   employeeId    String?   @unique
-  phoneNumber   String    @unique @db.VarChar(20)
+  mobile   String    @unique @db.VarChar(20)
   role          UserRole  @default(USER)
   avatarUrl     String?
   
