@@ -42,7 +42,7 @@ export const RouteController = {
 
       if (!routeGeometry) {
         throwError(
-          HTTP_STATUS.INTERNAL_SERVER_ERROR,
+          HTTP_STATUS.BAD_GATEWAY,
           "Geoapify routing response missing geometry"
         );
       }
@@ -103,15 +103,7 @@ const buildNearestNeighborOrder = (
     });
 
     if (nextIndex === null) {
-      const iterator = remaining.values().next();
-      if (iterator.done) {
-        break;
-      }
-      nextIndex = iterator.value;
-    }
-
-    if (nextIndex === null) {
-      break;
+      nextIndex = remaining.values().next().value;
     }
 
     remaining.delete(nextIndex);

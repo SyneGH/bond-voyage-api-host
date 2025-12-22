@@ -29,7 +29,7 @@ export class GeoapifyService {
   }>();
 
   private static getApiKey(): string {
-    const apiKey = process.env.GEOAPIFY_API_KEY ?? "";
+    const apiKey = process.env.GEOAPIFY_API_KEY;
     if (!apiKey) {
       throwError(
         HTTP_STATUS.INTERNAL_SERVER_ERROR,
@@ -96,14 +96,12 @@ export class GeoapifyService {
 
     if (!Array.isArray(matrix)) {
       throwError(
-        HTTP_STATUS.INTERNAL_SERVER_ERROR,
+        HTTP_STATUS.BAD_GATEWAY,
         "Unexpected Geoapify route matrix response"
       );
     }
 
-    const safeMatrix = matrix as MatrixCell[][];
-
-    const distances = safeMatrix.map((row) =>
+    const distances = matrix.map((row) =>
       Array.isArray(row)
         ? row.map((cell) =>
             typeof cell?.distance === "number" ? cell.distance : null
@@ -111,7 +109,7 @@ export class GeoapifyService {
         : []
     );
 
-    const times = safeMatrix.map((row) =>
+    const times = matrix.map((row) =>
       Array.isArray(row)
         ? row.map((cell) => {
             if (typeof cell?.time === "number") return cell.time;
