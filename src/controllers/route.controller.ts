@@ -103,7 +103,11 @@ const buildNearestNeighborOrder = (
     });
 
     if (nextIndex === null) {
-      nextIndex = remaining.values().next().value;
+      const iter = remaining.values().next();
+        if (iter.done || typeof iter.value !== "number") {
+          break; // no valid next node
+        }
+        nextIndex = iter.value;
     }
 
     remaining.delete(nextIndex);

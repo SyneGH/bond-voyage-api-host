@@ -36,7 +36,7 @@ export class GeoapifyService {
         "GEOAPIFY_API_KEY is required for this endpoint"
       );
     }
-    return apiKey;
+    return apiKey!;
   }
 
   static async autocomplete(text: string, limit = 3): Promise<unknown[]> {
@@ -100,8 +100,9 @@ export class GeoapifyService {
         "Unexpected Geoapify route matrix response"
       );
     }
+    const matrixSafe = matrix as MatrixCell[][];
 
-    const distances = matrix.map((row) =>
+    const distances = matrixSafe.map((row) =>
       Array.isArray(row)
         ? row.map((cell) =>
             typeof cell?.distance === "number" ? cell.distance : null
@@ -109,7 +110,7 @@ export class GeoapifyService {
         : []
     );
 
-    const times = matrix.map((row) =>
+    const times = matrixSafe.map((row) =>
       Array.isArray(row)
         ? row.map((cell) => {
             if (typeof cell?.time === "number") return cell.time;

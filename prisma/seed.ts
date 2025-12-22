@@ -37,21 +37,6 @@ async function main() {
       },
     }),
     prisma.user.upsert({
-      where: { email: "sarah.admin@example.com" },
-      update: {},
-      create: {
-        firstName: "Sarah",
-        lastName: "Agency",
-        email: "sarah.admin@example.com",
-        mobile: "+1122334455",
-        password: adminPassword,
-        role: UserRole.ADMIN,
-        isActive: true,
-        companyName: "Travel Solutions Co.",
-        customerRating: 4.72,
-      },
-    }),
-    prisma.user.upsert({
       where: { email: "user@example.com" },
       update: {},
       create: {
