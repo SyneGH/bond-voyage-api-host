@@ -171,6 +171,21 @@ model Booking {
   @@map("bookings")
 }
 
+model Location {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  alias       String[]
+  latitude    Float
+  longitude   Float
+  imageUrl    String?
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("locations")
+}
+
 // =========================================
 // ITINERARY STRUCTURE
 // =========================================

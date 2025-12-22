@@ -6,7 +6,14 @@ const locationDto = z.object({
 });
 
 export const optimizeRouteDto = z.object({
-  origin: locationDto,
-  destination: locationDto,
-  waypoints: z.array(locationDto).optional(),
+  dayId: z.string().optional(),
+  mode: z.string().optional(),
+  activities: z
+    .array(
+      z.object({
+        id: z.string().min(1),
+        ...locationDto.shape,
+      })
+    )
+    .min(2, "At least two activities are required"),
 });
