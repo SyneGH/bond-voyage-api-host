@@ -198,6 +198,50 @@ Content-Type: application/json
 GET {{baseUrl}}/users?page=1&limit=10
 Authorization: Bearer {{accessToken}}
 
+### ======================================================
+### 9. PLACES (AUTOCOMPLETE)
+### ======================================================
+### Search approved locations only
+# Expected: 200 OK (bondvoyage results)
+GET {{baseUrl}}/places/search?text=boracay
+
+### Search with Geoapify fallback
+# Expected: 200 OK (bondvoyage + geoapify results)
+GET {{baseUrl}}/places/search?text=palawan&allowExternal=true
+
+### Search validation error
+# Expected: 400 Bad Request
+GET {{baseUrl}}/places/search
+
+### ======================================================
+### 10. ROUTES (OPTIMIZE)
+### ======================================================
+### Optimize route (requires auth, Geoapify)
+# Expected: 200 OK
+POST {{baseUrl}}/routes/optimize
+Content-Type: application/json
+Authorization: Bearer {{userToken}}
+
+{
+  "mode": "drive",
+  "activities": [
+    { "id": "a1", "lat": 14.5995, "lng": 120.9842 },
+    { "id": "a2", "lat": 14.5547, "lng": 121.0244 },
+    { "id": "a3", "lat": 14.676, "lng": 121.0437 }
+  ]
+}
+
+### Optimize route invalid payload
+# Expected: 400 Bad Request
+POST {{baseUrl}}/routes/optimize
+Content-Type: application/json
+Authorization: Bearer {{userToken}}
+
+{
+  "mode": "drive",
+  "activities": []
+}
+
 ### Get user (admin)
 # Expected: 200 OK
 # Expected (non-admin): 403 Forbidden
