@@ -54,6 +54,9 @@ export const userListQueryDto = z.object({
       if (value === "false" || value === false) return false;
       return undefined;
     }, z.boolean().optional()),
+
+  startDate: z.string().optional(),
+  endDate: z.string().optional(),
 });
 
 export const userIdParamDto = z.object({
@@ -63,4 +66,21 @@ export const userIdParamDto = z.object({
 export const updateUserAdminDto = z.object({
   role: z.enum(["USER", "ADMIN"]).optional(),
   isActive: z.boolean().optional(),
+
+  firstName: z
+    .string()
+    .min(UserEnum.FIRST_NAME_MIN)
+    .max(UserEnum.FIRST_NAME_MAX)
+    .optional(),
+  lastName: z
+    .string()
+    .min(UserEnum.LAST_NAME_MIN)
+    .max(UserEnum.LAST_NAME_MAX)
+    .optional(),
+  email: z
+    .string()
+    .email()
+    .regex(Regex.EMAIL_PATTERN)
+    .optional(),
+  mobile: z.string().optional(),
 });

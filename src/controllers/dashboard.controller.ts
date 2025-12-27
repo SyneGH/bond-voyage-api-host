@@ -10,7 +10,15 @@ export const DashboardController = {
   stats: async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
       const { year } = dashboardStatsQueryDto.parse(req.query);
-      const result = await DashboardService.getStats(year);
+
+      const userId = req.user?.userId; 
+
+      if (!userId) {
+        throwError(HTTP_STATUS.UNAUTHORIZED, "User not authenticated");
+        return;
+      }
+
+      const result = await DashboardService.getStats(year, userId);
       createResponse(res, HTTP_STATUS.OK, "Dashboard stats retrieved", result);
     } catch (error) {
       if (error instanceof ZodError) {

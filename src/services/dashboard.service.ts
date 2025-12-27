@@ -53,7 +53,7 @@ const computeLinearRegression = (values: number[]) => {
 };
 
 export const DashboardService = {
-  async getStats(year: number) {
+  async getStats(year: number, userId: string) {
     const [totalUsers, pendingApprovals, activeBookings, completedTrips] =
       await prisma.$transaction([
         prisma.user.count(),
@@ -61,6 +61,11 @@ export const DashboardService = {
         prisma.booking.count({ where: { status: "CONFIRMED" } }),
         prisma.booking.count({ where: { status: "COMPLETED" } }),
       ]);
+
+    const userProfile = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { firstName: true, lastName: true, avatarUrl: true, email: true }
+    });
 
     const yearStart = new Date(Date.UTC(year, 0, 1));
     const nextYearStart = new Date(Date.UTC(year + 1, 0, 1));
@@ -158,11 +163,13 @@ export const DashboardService = {
     });
 
     return {
+      user: userProfile,
       cards: {
         totalUsers,
         pendingApprovals,
         activeBookings,
         completedTrips,
+        faqsCard: 0
       },
       trends: {
         year,

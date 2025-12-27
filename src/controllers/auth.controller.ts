@@ -34,11 +34,12 @@ class AuthController {
       }
 
       const authUser = user as NonNullable<typeof user>;
+      const isProduction = process.env.NODE_ENV === "production";
 
       res.cookie("refreshToken", refreshToken, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "strict",
+        secure: isProduction,
+        sameSite: isProduction ? "none" : "lax",
         maxAge: toMilliseconds(7, "day"),
       });
 
@@ -81,14 +82,15 @@ class AuthController {
       }
 
       const authUser = user as NonNullable<typeof user>;
+      const isProduction = process.env.NODE_ENV === "production";
 
       res.cookie("refreshToken", refreshToken, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "strict",
+        secure: isProduction,
+        sameSite: isProduction ? "none" : "lax",
         maxAge: toMilliseconds(7, "day"),
       });
-
+      
       createResponse(res, HTTP_STATUS.OK, "Login successful", {
         user: {
           id: authUser.id,
@@ -104,6 +106,8 @@ class AuthController {
         accessToken,
       });
     } catch (error) {
+      console.error("❌ Login Critical Error:", error);
+
       if (error instanceof ZodError) {
         throwError(HTTP_STATUS.BAD_REQUEST, "Validation failed", error.errors);
       }
@@ -126,11 +130,12 @@ class AuthController {
       }
 
       const tokenPayload = await authService.refreshToken(refreshToken);
+      const isProduction = process.env.NODE_ENV === "production";
 
-      res.cookie("refreshToken", tokenPayload.refreshToken, {
+      res.cookie("refreshToken", refreshToken, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "strict",
+        secure: isProduction,
+        sameSite: isProduction ? "none" : "lax",
         maxAge: toMilliseconds(7, "day"),
       });
 

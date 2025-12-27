@@ -9,7 +9,7 @@
 
 @localBaseUrl = http://localhost:8087/api/v1
 @prodBaseUrl = https://bond-voyage-api-host.onrender.com/api/v1
-@baseUrl = {{localBaseUrl}}
+@baseUrl = {{prodBaseUrl}}
 
 @email = user@example.com
 @password = User@123
@@ -203,7 +203,7 @@ Authorization: Bearer {{accessToken}}
 ### ======================================================
 ### Search approved locations only
 # Expected: 200 OK (bondvoyage results)
-GET {{baseUrl}}/places/search?text=boracay
+GET {{baseUrl}}/places/search?text=santa rosa
 
 ### Search with Geoapify fallback
 # Expected: 200 OK (bondvoyage + geoapify results)

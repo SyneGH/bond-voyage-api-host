@@ -37,13 +37,26 @@ async function main() {
       },
     }),
     prisma.user.upsert({
+      where: { email: "admin2@example.com" },
+      update: {},
+      create: {
+        firstName: "Admin2",
+        lastName: "BondVoyage",
+        email: "admin2@example.com",
+        mobile: "+1234567891",
+        password: adminPassword,
+        role: UserRole.ADMIN,
+        isActive: true,
+      },
+    }),
+    prisma.user.upsert({
       where: { email: "user@example.com" },
       update: {},
       create: {
         firstName: "John",
         lastName: "Traveler",
         email: "user@example.com",
-        mobile: "+1234567891",
+        mobile: "+1234567892",
         password: userPassword,
         role: UserRole.USER,
         isActive: true,
@@ -56,7 +69,7 @@ async function main() {
         firstName: "Maria",
         lastName: "Collaborator",
         email: "collab@example.com",
-        mobile: "+1234567892",
+        mobile: "+1234567893",
         password: userPassword,
         role: UserRole.USER,
         isActive: true,
@@ -310,6 +323,24 @@ async function main() {
 
   console.log("✅ Created Booking:", booking.id);
   console.log("✅ Created Collaboration, Payment, Inquiry, Feedback, Activity Log, Notification");
+
+  await prisma.booking.create({
+    data: {
+      userId: user.id,
+      destination: "El Nido (Rejected Test)",
+      startDate: new Date("2025-07-01"),
+      endDate: new Date("2025-07-05"),
+      travelers: 4,
+      totalPrice: 45000.0,
+      type: BookingType.CUSTOMIZED,
+      status: BookingStatus.REJECTED, // Critical for testing
+      tourType: TourType.PRIVATE,
+      rejectionReason: "Dates unavailable due to weather.",
+      rejectionResolution: "Please select dates in August.",
+      isResolved: false,
+    },
+  });
+  console.log("✅ Created 'Rejected' Booking for frontend testing.");
 
   console.log("\n🎉 Database seeding completed!");
   console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");

@@ -275,11 +275,34 @@ export const BookingController = {
         page,
         limit
       );
+      const formattedItems = result.items.map((b: any) => ({
+        id: b.id,
+        // Flatten User Data
+        customer: `${b.user.firstName} ${b.user.lastName}`,
+        email: b.user.email,
+        mobile: b.user.mobile || "N/A", // Ensure this exists in service selection if needed
+        
+        // Flatten Trip Data
+        destination: b.destination,
+        dates: `${new Date(b.startDate).toISOString().split('T')[0]} - ${new Date(b.endDate).toISOString().split('T')[0]}`,
+        travelers: b.travelers,
+        total: b.totalPrice.toString(),
+        bookedDate: b.createdAt,
+        
+        // Missing Frontend Fields
+        rejectionReason: b.rejectionReason,
+        rejectionResolution: b.rejectionResolution,
+        resolutionStatus: b.isResolved ? 'resolved' : 'unresolved',
+        statusBadges: b.status, 
+        bookingType: b.type,
+        tourType: b.tourType,
+      }));
       createResponse(
         res,
         HTTP_STATUS.OK,
         "Bookings retrieved",
-        result.items,
+        // result.items,
+        formattedItems,
         result.meta
       );
     } catch (error) {

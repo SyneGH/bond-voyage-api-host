@@ -15,6 +15,7 @@ import {
   userListQueryDto,
 } from "@/validators/user.dto";
 import { requireAuthUser } from "@/utils/requestGuards";
+import { prisma } from "@/config/database";
 
 class UserController {
   // Cache TTL constants (in seconds)
@@ -30,16 +31,29 @@ class UserController {
       limit: number,
       q?: string,
       role?: string,
-      isActive?: boolean
+      isActive?: boolean,
+      startDate?: string,
+      endDate?: string
     ) =>
       `users:list:page:${page}:limit:${limit}:q:${q || "none"}:role:${
         role || "all"
-      }:isActive:${isActive === undefined ? "all" : String(isActive)}`,
+      }:isActive:${isActive === undefined ? "all" : String(isActive)}:startDate:${
+        startDate || "all"
+      }:endDate:${endDate || "all"}`, // <--- Added these lines
+
     singleUser: (id: string) => `user:${id}`,
-    userCount: (q?: string, role?: string, isActive?: boolean) =>
+
+    // NOTE: You should technically update userCount too if the count depends on the date filter
+    userCount: (
+      q?: string, 
+      role?: string, 
+      isActive?: boolean, 
+      startDate?: string, 
+      endDate?: string
+    ) =>
       `users:count:q:${q || "none"}:role:${role || "all"}:isActive:${
         isActive === undefined ? "all" : String(isActive)
-      }`,
+      }:startDate:${startDate || "all"}:endDate:${endDate || "all"}`,
   };
 
   // Cache invalidation helpers
@@ -109,25 +123,37 @@ class UserController {
     }
   };
 
-  // Get all users (admin only)
+// Get all users (admin only)
   public getAllUsers = async (
     req: AuthenticatedRequest,
     res: Response
   ): Promise<void> => {
     try {
-      const { page, limit, q, role, isActive } = userListQueryDto.parse(
+      // 1. Parse all parameters including dates
+      const { page, limit, q, role, isActive, startDate, endDate } = userListQueryDto.parse(
         req.query
-      );
+      ) as any;
 
+      // 2. Generate Cache Keys
       const listCacheKey = this.generateCacheKey.userList(
         page,
         limit,
         q,
         role,
-        isActive
+        isActive,
+        startDate,
+        endDate
       );
-      const countCacheKey = this.generateCacheKey.userCount(q, role, isActive);
+      
+      const countCacheKey = this.generateCacheKey.userCount(
+        q, 
+        role, 
+        isActive,
+        startDate,
+        endDate
+      );
 
+      // 3. Check Redis Cache
       let cachedUsers: string | null = null;
       let cachedCount: string | null = null;
 
@@ -161,7 +187,10 @@ class UserController {
         return;
       }
 
-      let whereClause: Prisma.UserWhereInput = {};
+      // 4. Build Database Query (The Fixes)
+      let whereClause: Prisma.UserWhereInput = {
+        role: { not: "ADMIN" }, // Rule: Never show admins in this list
+      };
 
       if (q) {
         whereClause.OR = [
@@ -172,28 +201,52 @@ class UserController {
         ];
       }
 
-      if (role) {
-        whereClause.role = role as "USER" | "ADMIN";
+      // Only apply specific role filter if it isn't 'ADMIN'
+      if (role && role !== 'ADMIN') {
+        whereClause.role = role as "USER";
       }
 
       if (typeof isActive === "boolean") {
         whereClause.isActive = isActive;
       }
 
-      const [users, total] = await Promise.all([
-        userService.findMany({
-          skip: (page - 1) * limit,
-          take: limit,
-          where: whereClause,
-          orderBy: { createdAt: "desc" },
-        }),
-        userService.count(whereClause),
-      ]);
+      // Date Filter Implementation
+      if (startDate || endDate) {
+        whereClause.createdAt = {};
+        if (startDate) {
+          whereClause.createdAt.gte = new Date(startDate);
+        }
+        if (endDate) {
+          whereClause.createdAt.lte = new Date(endDate);
+        }
+      }
 
-      const transformedUsers = users.map((user) =>
-        userService.transformUser(user)
-      );
+      // 5. Fetch Data & Count from DB
+      const users = await prisma.user.findMany({
+        skip: (page - 1) * limit,
+        take: limit,
+        where: whereClause,
+        orderBy: { createdAt: "desc" },
+        include: {
+          bookings: {
+            take: 1,
+            orderBy: { startDate: "desc" },
+            select: { startDate: true, endDate: true },
+          },
+        },
+      });
 
+      // Count using the EXACT same filters (so pagination is correct)
+      const total = await userService.count(whereClause);
+
+      // 6. Transform Data
+      const transformedUsers = users.map((user: any) => ({
+        ...userService.transformUser(user),
+        dateFrom: user.bookings[0]?.startDate || null,
+        dateTo: user.bookings[0]?.endDate || null,
+      }));
+
+      // 7. Update Cache
       try {
         await Promise.all([
           redis.setex(
