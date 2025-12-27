@@ -688,7 +688,7 @@ POST {{baseUrl}}/chatbots/roameo
 Content-Type: application/json
 
 {
-  "message": "How do I add collaborators?"
+  "message": "How do I create a booking?"
 }
 
 ### Roaman (requires GEMINI_API_KEY)

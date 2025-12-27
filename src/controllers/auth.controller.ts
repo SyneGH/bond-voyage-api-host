@@ -104,6 +104,7 @@ class AuthController {
           customerRating: authUser.customerRating,
         },
         accessToken,
+        refreshToken
       });
     } catch (error) {
       console.error("❌ Login Critical Error:", error);
