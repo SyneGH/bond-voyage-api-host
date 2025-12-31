@@ -169,6 +169,9 @@ model Itinerary {
   status               ItineraryStatus         @default(DRAFT)
   tourType             TourType                @default(PRIVATE)
 
+  // Track Admin-to-User flow for "Requested" itineraries
+  sentStatus           String?                 // e.g., "Draft", "Sent to User"
+
   // Rejection/Resolution Logic
   rejectionReason      String?
   rejectionResolution  String?
@@ -244,11 +247,22 @@ model Booking {
   user               User          @relation(fields: [userId], references: [id])
 
   bookingCode        String        @unique
+
+  // Customer Data (captured from the Standard Itinerary modal)
+  customerName       String?       //
+  customerEmail      String?       //
+  customerMobile     String?       //
+  bookedDate         DateTime      @default(now())
+
   totalPrice         Decimal       @db.Decimal(10, 2)
 
   type               BookingType   @default(CUSTOMIZED)
   status             BookingStatus @default(PENDING)
   tourType           TourType      @default(PRIVATE)
+
+  // Payment Visibility (requested for "get my bookings")
+  paymentStatus      PaymentStatus @default(PENDING) //
+  paymentReceiptUrl  String?       // URL to uploaded GCash/Receipt image
 
   rejectionReason    String?
   rejectionResolution String?
