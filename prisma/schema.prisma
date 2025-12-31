@@ -19,6 +19,21 @@ enum UserRole {
   ADMIN
 }
 
+enum ItineraryType {
+  STANDARD
+  CUSTOMIZED
+  REQUESTED
+  SMART_TRIP
+}
+
+enum ItineraryStatus {
+  DRAFT
+  PENDING
+  APPROVED
+  REJECTED
+  ARCHIVED
+}
+
 enum BookingType {
   STANDARD    // Booked from a pre-made package
   CUSTOMIZED  // Built by user (or AI)
@@ -78,40 +93,41 @@ enum NotificationType {
 // =========================================
 
 model User {
-  id            String    @id @default(uuid())
-  email         String    @unique @db.VarChar(255)
-  password      String    // Hashed
-  firstName     String?   @db.VarChar(50)
-  middleName    String?   @db.VarChar(50)
-  lastName      String?   @db.VarChar(50)
-  birthday      DateTime?
-  employeeId    String?   @unique
-  mobile   String    @unique @db.VarChar(20)
-  role          UserRole  @default(USER)
-  avatarUrl     String?
-  
+  id                 String                  @id @default(uuid())
+  email              String                  @unique @db.VarChar(255)
+  password           String                  // Hashed
+  firstName          String?                 @db.VarChar(50)
+  middleName         String?                 @db.VarChar(50)
+  lastName           String?                 @db.VarChar(50)
+  birthday           DateTime?
+  employeeId         String?                 @unique
+  mobile             String                  @unique @db.VarChar(20)
+  role               UserRole                @default(USER)
+  avatarUrl          String?
+
   // Auth & Security
-  refreshTokens String[]  @default([])
-  isActive      Boolean   @default(true)
-  lastLogin     DateTime?
+  refreshTokens      String[]                @default([])
+  isActive           Boolean                 @default(true)
+  lastLogin          DateTime?
 
   // Admin Specific Fields
-  companyName   String?
-  customerRating Decimal? @db.Decimal(3, 2)
+  companyName        String?
+  customerRating     Decimal?                @db.Decimal(3, 2)
 
   // Relations
-  bookings      Booking[]
-  collaborations BookingCollaborator[]
-  feedback      Feedback[]
-  respondedFeedback Feedback[] @relation("feedback_responses")
-  activityLogs  ActivityLog[]
-  inquiries     Inquiry[]
-  messages      Message[]
-  notifications Notification[]
-  paymentSubmissions Payment[] @relation("payment_submissions")
-  
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  bookings           Booking[]
+  itineraries        Itinerary[]
+  collaborations     ItineraryCollaborator[]
+  feedback           Feedback[]
+  respondedFeedback  Feedback[]              @relation("feedback_responses")
+  activityLogs       ActivityLog[]
+  inquiries          Inquiry[]
+  messages           Message[]
+  notifications      Notification[]
+  paymentSubmissions Payment[]               @relation("payment_submissions")
+
+  createdAt          DateTime                @default(now())
+  updatedAt          DateTime                @updatedAt
 
   @@map("users")
 }
@@ -123,7 +139,7 @@ model TourPackage {
   destination String
   category    String?
   description String?
-  
+
   price       Decimal  @db.Decimal(10, 2)
   duration    Int      // Number of days
   thumbUrl    String?
@@ -137,39 +153,131 @@ model TourPackage {
   @@map("tour_packages")
 }
 
-model Booking {
-  id              String        @id @default(uuid())
-  userId          String
-  user            User          @relation(fields: [userId], references: [id])
-  
-  // Core Trip Info
-  destination     String
-  startDate       DateTime
-  endDate         DateTime
-  travelers       Int           @default(1)
-  totalPrice      Decimal       @db.Decimal(10, 2)
-  
-  // Metadata
-  type            BookingType   @default(CUSTOMIZED)
-  status          BookingStatus @default(DRAFT)
-  tourType        TourType      @default(PRIVATE)
-  
-  // Rejection/Resolution Logic
-  rejectionReason     String?
-  rejectionResolution String?
-  isResolved          Boolean   @default(false)
+model Itinerary {
+  id                   String                  @id @default(uuid())
+  userId               String
+  user                 User                    @relation(fields: [userId], references: [id])
 
-  // Relations
-  itinerary       ItineraryDay[]
-  payments        Payment[]
-  collaborators   BookingCollaborator[]
-  inquiries       Inquiry[]
-  
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  title                String?
+  destination          String
+  startDate            DateTime?
+  endDate              DateTime?
+  travelers            Int                     @default(1)
+  estimatedCost        Decimal?                @db.Decimal(10, 2)
+
+  type                 ItineraryType           @default(CUSTOMIZED)
+  status               ItineraryStatus         @default(DRAFT)
+  tourType             TourType                @default(PRIVATE)
+
+  // Rejection/Resolution Logic
+  rejectionReason      String?
+  rejectionResolution  String?
+  isResolved           Boolean                 @default(false)
+
+  days                 ItineraryDay[]
+  collaborators        ItineraryCollaborator[]
+  bookings             Booking[]
+  inquiries            Inquiry[]
+
+  createdAt            DateTime                @default(now())
+  updatedAt            DateTime                @updatedAt
+
+  @@map("itineraries")
+}
+
+// =========================================
+// ITINERARY STRUCTURE
+// =========================================
+
+model ItineraryDay {
+  id          String     @id @default(uuid())
+  itineraryId String
+  itinerary   Itinerary  @relation(fields: [itineraryId], references: [id], onDelete: Cascade)
+
+  dayNumber   Int        // 1, 2, 3...
+  date        DateTime?
+
+  activities  Activity[]
+
+  @@unique([itineraryId, dayNumber])
+  @@map("itinerary_days")
+}
+
+model Activity {
+  id              String       @id @default(uuid())
+  itineraryDayId  String
+  itineraryDay    ItineraryDay @relation(fields: [itineraryDayId], references: [id], onDelete: Cascade)
+
+  time            String
+  title           String
+  description     String?
+  location        String?
+  icon            String?
+
+  order           Int
+
+  @@map("activities")
+}
+
+model ItineraryCollaborator {
+  id         String           @id @default(uuid())
+  itineraryId String
+  itinerary  Itinerary        @relation(fields: [itineraryId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role       CollaboratorRole @default(COLLABORATOR)
+  addedAt    DateTime         @default(now())
+
+  @@unique([itineraryId, userId])
+  @@map("itinerary_collaborators")
+}
+
+// =========================================
+// TRANSACTIONAL BOOKING
+// =========================================
+
+model Booking {
+  id                 String        @id @default(uuid())
+  itineraryId        String
+  itinerary          Itinerary     @relation(fields: [itineraryId], references: [id], onDelete: Cascade)
+  userId             String
+  user               User          @relation(fields: [userId], references: [id])
+
+  bookingCode        String        @unique
+  totalPrice         Decimal       @db.Decimal(10, 2)
+
+  type               BookingType   @default(CUSTOMIZED)
+  status             BookingStatus @default(PENDING)
+  tourType           TourType      @default(PRIVATE)
+
+  rejectionReason    String?
+  rejectionResolution String?
+  isResolved         Boolean       @default(false)
+
+  payments           Payment[]
+  inquiries          Inquiry[]
+
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
 
   @@map("bookings")
 }
+
+model BookingSequence {
+  id            Int      @id @default(autoincrement())
+  year          Int
+  currentNumber Int      @default(0)
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([year])
+  @@map("booking_sequences")
+}
+
+// =========================================
+// LOCATION CATALOG
+// =========================================
 
 model Location {
   id          String   @id @default(uuid())
@@ -187,40 +295,6 @@ model Location {
 }
 
 // =========================================
-// ITINERARY STRUCTURE
-// =========================================
-
-model ItineraryDay {
-  id          String    @id @default(uuid())
-  bookingId   String
-  booking     Booking   @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-  
-  dayNumber   Int       // 1, 2, 3...
-  date        DateTime? 
-  
-  activities  Activity[]
-
-  @@unique([bookingId, dayNumber])
-  @@map("itinerary_days")
-}
-
-model Activity {
-  id              String       @id @default(uuid())
-  itineraryDayId  String
-  itineraryDay    ItineraryDay @relation(fields: [itineraryDayId], references: [id], onDelete: Cascade)
-  
-  time            String       
-  title           String       
-  description     String?      
-  location        String?
-  icon            String?      
-  
-  order           Int          
-
-  @@map("activities")
-}
-
-// =========================================
 // FINANCIALS
 // =========================================
 
@@ -230,17 +304,17 @@ model Payment {
   booking       Booking       @relation(fields: [bookingId], references: [id])
   submittedById String?
   submittedBy   User?         @relation("payment_submissions", fields: [submittedById], references: [id])
-  
+
   amount        Decimal       @db.Decimal(10, 2)
   method        PaymentMethod @default(GCASH)
   status        PaymentStatus @default(PENDING)
   type          PaymentType   @default(PARTIAL)
-  
+
   proofImage    Bytes?
   proofMimeType String?
-  proofSize     Int?       
-  transactionId String?       
-  
+  proofSize     Int?
+  transactionId String?
+
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 
@@ -252,18 +326,18 @@ model Payment {
 // =========================================
 
 model Feedback {
-  id          String   @id @default(uuid())
-  userId      String
-  user        User     @relation(fields: [userId], references: [id])
+  id            String   @id @default(uuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id])
   respondedById String?
-  respondedBy  User?    @relation("feedback_responses", fields: [respondedById], references: [id])
-  
-  rating      Int      
-  comment     String?
-  response    String?
-  respondedAt DateTime?
-  
-  createdAt   DateTime @default(now())
+  respondedBy   User?    @relation("feedback_responses", fields: [respondedById], references: [id])
+
+  rating        Int
+  comment       String?
+  response      String?
+  respondedAt   DateTime?
+
+  createdAt     DateTime @default(now())
 
   @@map("feedbacks")
 }
@@ -272,10 +346,10 @@ model ActivityLog {
   id        String   @id @default(uuid())
   userId    String
   user      User     @relation(fields: [userId], references: [id])
-  
-  action    String   
-  details   String?  
-  
+
+  action    String
+  details   String?
+
   timestamp DateTime @default(now())
 
   @@map("activity_logs")
@@ -300,35 +374,18 @@ model TourPackageDay {
 }
 
 model TourPackageActivity {
-  id              String         @id @default(uuid())
+  id               String         @id @default(uuid())
   tourPackageDayId String
-  tourPackageDay  TourPackageDay @relation(fields: [tourPackageDayId], references: [id], onDelete: Cascade)
+  tourPackageDay   TourPackageDay @relation(fields: [tourPackageDayId], references: [id], onDelete: Cascade)
 
-  time            String
-  title           String
-  description     String?
-  location        String?
-  icon            String?
-  order           Int
+  time             String
+  title            String
+  description      String?
+  location         String?
+  icon             String?
+  order            Int
 
   @@map("tour_package_activities")
-}
-
-// =========================================
-// COLLABORATION
-// =========================================
-
-model BookingCollaborator {
-  id        String           @id @default(uuid())
-  bookingId String
-  booking   Booking          @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-  userId    String
-  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  role      CollaboratorRole @default(COLLABORATOR)
-  addedAt   DateTime         @default(now())
-
-  @@unique([bookingId, userId])
-  @@map("booking_collaborators")
 }
 
 // =========================================
@@ -336,19 +393,21 @@ model BookingCollaborator {
 // =========================================
 
 model Inquiry {
-  id        String        @id @default(uuid())
-  userId    String
-  user      User          @relation(fields: [userId], references: [id])
-  bookingId String?
-  booking   Booking?      @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+  id          String        @id @default(uuid())
+  userId      String
+  user        User          @relation(fields: [userId], references: [id])
+  bookingId   String?
+  booking     Booking?      @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+  itineraryId String?
+  itinerary   Itinerary?    @relation(fields: [itineraryId], references: [id], onDelete: SetNull)
 
-  subject   String
-  status    InquiryStatus @default(OPEN)
+  subject     String
+  status      InquiryStatus @default(OPEN)
 
-  messages  Message[]
+  messages    Message[]
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   @@map("inquiries")
 }
