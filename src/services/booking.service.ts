@@ -1,17 +1,121 @@
-import { BookingStatus, Prisma } from "@prisma/client";
+import {
+  BookingStatus,
+  BookingType,
+  ItineraryType,
+  Prisma,
+  TourType,
+} from "@prisma/client";
+import { Role } from "@/constants/constants";
 import { prisma } from "@/config/database";
 import { logActivity } from "@/services/activity-log.service";
 import { NotificationService } from "@/services/notification.service";
 
+const BOOKING_CODE_PREFIX = "BV";
+const BOOKING_CODE_PADDING = 3;
+
+const buildBookingCode = (year: number, sequence: number) =>
+  `${BOOKING_CODE_PREFIX}-${year}-${String(sequence).padStart(BOOKING_CODE_PADDING, "0")}`;
+
+const ensureBookingSequence = async (
+  tx: Prisma.TransactionClient,
+  year: number
+) => {
+  const latestBookingForYear = await tx.booking.findFirst({
+    where: { bookingCode: { startsWith: `${BOOKING_CODE_PREFIX}-${year}-` } },
+    orderBy: { bookingCode: "desc" },
+    select: { bookingCode: true },
+  });
+
+  const latestNumber = latestBookingForYear?.bookingCode?.split("-").at(2);
+  const seedNumber = latestNumber ? Number.parseInt(latestNumber, 10) || 0 : 0;
+
+  const sequence = await tx.bookingSequence.upsert({
+    where: { year },
+    update: {},
+    create: {
+      year,
+      currentNumber: seedNumber,
+      lastIssuedCode: latestBookingForYear?.bookingCode,
+    },
+    select: { id: true, currentNumber: true, lastIssuedCode: true },
+  });
+
+  const targetNumber = Math.max(sequence.currentNumber ?? 0, seedNumber);
+  const shouldRefreshSeed =
+    sequence.currentNumber < targetNumber ||
+    (!sequence.lastIssuedCode && latestBookingForYear?.bookingCode);
+
+  if (!shouldRefreshSeed) {
+    return sequence;
+  }
+
+  return tx.bookingSequence.update({
+    where: { id: sequence.id },
+    data: {
+      currentNumber: targetNumber,
+      lastIssuedCode: latestBookingForYear?.bookingCode ?? sequence.lastIssuedCode,
+    },
+  });
+};
+
+const generateBookingCode = async (tx: Prisma.TransactionClient) => {
+  const year = new Date().getFullYear();
+  const sequence = await ensureBookingSequence(tx, year);
+
+  const incremented = await tx.bookingSequence.update({
+    where: { id: sequence.id },
+    data: { currentNumber: { increment: 1 } },
+    select: { currentNumber: true },
+  });
+
+  const bookingCode = buildBookingCode(year, incremented.currentNumber);
+
+  await tx.bookingSequence.update({
+    where: { id: sequence.id },
+    data: { lastIssuedCode: bookingCode },
+  });
+
+  return bookingCode;
+};
+
 interface CreateBookingDTO {
   userId: string;
+  role: string;
+  itineraryId?: string;
+  itinerary?: InlineItineraryDTO;
+  totalPrice: number;
+  type?: BookingType;
+  tourType?: TourType;
+}
+
+interface InlineItineraryDTO {
+  title?: string | null;
+  destination: string;
+  startDate?: Date | null;
+  endDate?: Date | null;
+  travelers: number;
+  type?: ItineraryType;
+  tourType?: TourType;
+  days?: {
+    dayNumber: number;
+    date?: Date | null;
+    activities: {
+      time: string;
+      title: string;
+      description?: string | null;
+      location?: string | null;
+      icon?: string | null;
+      order: number;
+    }[];
+  }[];
+}
+
+interface UpdateBookingItineraryDTO {
   destination: string;
   startDate: Date;
   endDate: Date;
   travelers: number;
   totalPrice: number;
-  type: "STANDARD" | "CUSTOMIZED" | "REQUESTED";
-  tourType: "JOINER" | "PRIVATE";
   itinerary: {
     dayNumber: number;
     date?: Date | null;
@@ -29,28 +133,67 @@ interface CreateBookingDTO {
 export const BookingService = {
   async createBooking(data: CreateBookingDTO) {
     return prisma.$transaction(async (tx) => {
+      const shouldCreateItinerary = !data.itineraryId && data.itinerary;
+
+      const itinerary = shouldCreateItinerary
+        ? await tx.itinerary.create({
+            // Deprecated inline creation path; kept for backward compatibility with legacy clients
+            data: {
+              userId: data.userId,
+              title: data.itinerary?.title ?? "Itinerary",
+              destination: data.itinerary?.destination ?? "",
+              startDate: data.itinerary?.startDate ?? undefined,
+              endDate: data.itinerary?.endDate ?? undefined,
+              travelers: data.itinerary?.travelers ?? 1,
+              type: data.itinerary?.type ?? ItineraryType.CUSTOMIZED,
+              tourType: data.itinerary?.tourType ?? data.tourType ?? TourType.PRIVATE,
+              days: data.itinerary?.days
+                ? {
+                    create: data.itinerary.days.map((day) => ({
+                      dayNumber: day.dayNumber,
+                      date: day.date ?? undefined,
+                      activities: { create: day.activities },
+                    })),
+                  }
+                : undefined,
+            },
+            include: { collaborators: true },
+          })
+        : await tx.itinerary.findUnique({
+            where: { id: data.itineraryId },
+            include: { collaborators: true },
+          });
+
+      if (!itinerary) {
+        throw new Error("ITINERARY_NOT_FOUND");
+      }
+
+      const isOwner = itinerary.userId === data.userId;
+      const isCollaborator = itinerary.collaborators?.some(
+        (collab) => collab.userId === data.userId
+      );
+      const isAdmin = data.role === Role.ADMIN;
+
+      if (!isOwner && !isCollaborator && !isAdmin) {
+        throw new Error("ITINERARY_FORBIDDEN");
+      }
+
+      const bookingCode = await generateBookingCode(tx);
+
       const booking = await tx.booking.create({
         data: {
+          bookingCode,
           userId: data.userId,
-          destination: data.destination,
-          startDate: data.startDate,
-          endDate: data.endDate,
-          travelers: data.travelers,
+          itineraryId: itinerary.id,
+          destination: itinerary.destination,
+          startDate: itinerary.startDate ?? undefined,
+          endDate: itinerary.endDate ?? undefined,
+          travelers: itinerary.travelers,
           // Prisma Decimal accepts number for many common setups; keep as-is for MVP
           totalPrice: data.totalPrice as unknown as Prisma.Decimal,
-          type: data.type,
-          tourType: data.tourType,
-          status: "DRAFT",
-
-          itinerary: {
-            create: data.itinerary.map((day) => ({
-              dayNumber: day.dayNumber,
-              date: day.date,
-              activities: {
-                create: day.activities,
-              },
-            })),
-          },
+          type: data.type ?? (itinerary.type as BookingType),
+          tourType: data.tourType ?? itinerary.tourType ?? TourType.PRIVATE,
+          status: BookingStatus.DRAFT,
         },
         include: {
           itinerary: { include: { activities: true } },
@@ -109,7 +252,7 @@ export const BookingService = {
   async updateItinerary(
     bookingId: string,
     userId: string,
-    data: Omit<CreateBookingDTO, "userId" | "type" | "tourType">
+    data: UpdateBookingItineraryDTO
   ) {
     return prisma.$transaction(async (tx) => {
       const booking = await tx.booking.findUnique({
