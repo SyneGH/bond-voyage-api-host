@@ -157,11 +157,17 @@ export const BookingService = {
                   }
                 : undefined,
             },
-            include: { collaborators: true },
+            include: {
+              collaborators: true,
+              days: { include: { activities: true }, orderBy: { dayNumber: "asc" } },
+            },
           })
         : await tx.itinerary.findUnique({
             where: { id: data.itineraryId },
-            include: { collaborators: true },
+            include: {
+              collaborators: true,
+              days: { include: { activities: true }, orderBy: { dayNumber: "asc" } },
+            },
           });
 
       if (!itinerary) {
@@ -196,7 +202,12 @@ export const BookingService = {
           status: BookingStatus.DRAFT,
         },
         include: {
-          itinerary: { include: { activities: true } },
+          itinerary: {
+            include: {
+              collaborators: true,
+              days: { include: { activities: true }, orderBy: { dayNumber: "asc" } },
+            },
+          },
         },
       });
 
@@ -227,16 +238,20 @@ export const BookingService = {
       include: {
         user: { select: { email: true, firstName: true, lastName: true } },
         payments: true,
-        collaborators: {
+        itinerary: {
           include: {
-            user: {
-              select: { id: true, firstName: true, lastName: true, email: true },
+            collaborators: {
+              include: {
+                user: {
+                  select: { id: true, firstName: true, lastName: true, email: true },
+                },
+              },
+            },
+            days: {
+              orderBy: { dayNumber: "asc" },
+              include: { activities: { orderBy: { order: "asc" } } },
             },
           },
-        },
-        itinerary: {
-          orderBy: { dayNumber: "asc" },
-          include: { activities: { orderBy: { order: "asc" } } },
         },
       },
     });
@@ -257,13 +272,13 @@ export const BookingService = {
     return prisma.$transaction(async (tx) => {
       const booking = await tx.booking.findUnique({
         where: { id: bookingId },
-        include: { collaborators: true },
+        include: { itinerary: { include: { collaborators: true } } },
       });
 
       if (!booking) throw new Error("BOOKING_NOT_FOUND");
 
       const isOwner = booking.userId === userId;
-      const isCollaborator = booking.collaborators.some(
+      const isCollaborator = booking.itinerary.collaborators.some(
         (collab) => collab.userId === userId
       );
 
@@ -279,7 +294,24 @@ export const BookingService = {
         throw new Error("BOOKING_NOT_EDITABLE");
       }
 
-      await tx.itineraryDay.deleteMany({ where: { bookingId } });
+      await tx.itineraryDay.deleteMany({ where: { itineraryId: booking.itineraryId } });
+
+      await tx.itinerary.update({
+        where: { id: booking.itineraryId },
+        data: {
+          destination: data.destination,
+          startDate: data.startDate,
+          endDate: data.endDate,
+          travelers: data.travelers,
+          days: {
+            create: data.itinerary.map((day) => ({
+              dayNumber: day.dayNumber,
+              date: day.date,
+              activities: { create: day.activities },
+            })),
+          },
+        },
+      });
 
       const updated = await tx.booking.update({
         where: { id: bookingId },
@@ -289,17 +321,7 @@ export const BookingService = {
           endDate: data.endDate,
           travelers: data.travelers,
           totalPrice: data.totalPrice as unknown as Prisma.Decimal,
-
-          // If it was rejected and user edits, you may want to mark unresolved again
           isResolved: false,
-
-          itinerary: {
-            create: data.itinerary.map((day) => ({
-              dayNumber: day.dayNumber,
-              date: day.date,
-              activities: { create: day.activities },
-            })),
-          },
         },
       });
 
@@ -456,7 +478,7 @@ export const BookingService = {
     const skip = (page - 1) * limit;
     const whereClause: Prisma.BookingWhereInput = {
       userId: { not: userId },
-      collaborators: { some: { userId } },
+      itinerary: { collaborators: { some: { userId } } },
     };
 
     if (status) {
@@ -677,6 +699,7 @@ export const BookingService = {
     return prisma.$transaction(async (tx) => {
       const booking = await tx.booking.findFirst({
         where: { id: bookingId, userId: ownerId },
+        select: { id: true, itineraryId: true, userId: true },
       });
 
       if (!booking) throw new Error("BOOKING_NOT_FOUND");
@@ -685,10 +708,10 @@ export const BookingService = {
         throw new Error("CANNOT_ADD_OWNER");
       }
 
-      const existing = await tx.bookingCollaborator.findUnique({
+      const existing = await tx.itineraryCollaborator.findUnique({
         where: {
-          bookingId_userId: {
-            bookingId,
+          itineraryId_userId: {
+            itineraryId: booking.itineraryId,
             userId: collaboratorId,
           },
         },
@@ -698,9 +721,9 @@ export const BookingService = {
         throw new Error("COLLABORATOR_EXISTS");
       }
 
-      const collaborator = await tx.bookingCollaborator.create({
+      const collaborator = await tx.itineraryCollaborator.create({
         data: {
-          bookingId,
+          itineraryId: booking.itineraryId,
           userId: collaboratorId,
         },
       });
@@ -720,10 +743,14 @@ export const BookingService = {
     const booking = await prisma.booking.findUnique({
       where: { id: bookingId },
       include: {
-        collaborators: {
+        itinerary: {
           include: {
-            user: {
-              select: { id: true, firstName: true, lastName: true, email: true },
+            collaborators: {
+              include: {
+                user: {
+                  select: { id: true, firstName: true, lastName: true, email: true },
+                },
+              },
             },
           },
         },
@@ -733,7 +760,7 @@ export const BookingService = {
     if (!booking) throw new Error("BOOKING_NOT_FOUND");
 
     const isOwner = booking.userId === userId;
-    const isCollaborator = booking.collaborators.some(
+    const isCollaborator = booking.itinerary.collaborators.some(
       (collab) => collab.userId === userId
     );
 
@@ -741,7 +768,7 @@ export const BookingService = {
       throw new Error("BOOKING_FORBIDDEN");
     }
 
-    return booking.collaborators;
+    return booking.itinerary.collaborators;
   },
 
   async removeCollaborator(
@@ -752,14 +779,15 @@ export const BookingService = {
     return prisma.$transaction(async (tx) => {
       const booking = await tx.booking.findFirst({
         where: { id: bookingId, userId: ownerId },
+        select: { id: true, itineraryId: true, userId: true },
       });
 
       if (!booking) throw new Error("BOOKING_NOT_FOUND");
 
-      const removed = await tx.bookingCollaborator.deleteMany({
+      const removed = await tx.itineraryCollaborator.deleteMany({
         where: {
           userId: collaboratorUserId,
-          bookingId,
+          itineraryId: booking.itineraryId,
         },
       });
 

@@ -76,8 +76,8 @@ export const BookingController = {
       const bookingRecord = booking as NonNullable<typeof booking>;
 
       if (authUser.role !== "ADMIN" && bookingRecord.userId !== authUser.userId) {
-        const isCollaborator = bookingRecord.collaborators?.some(
-          (collab) => collab.userId === authUser.userId
+        const isCollaborator = bookingRecord.itinerary?.collaborators?.some(
+          (collab: { userId: string }) => collab.userId === authUser.userId
         );
 
         if (!isCollaborator) {
