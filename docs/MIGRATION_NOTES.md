@@ -11,3 +11,7 @@
 - Existing data must be migrated: move booking-owned itinerary rows into the new `itineraries` table before applying the schema changes; otherwise foreign-key constraints will fail.
 - Generate `bookingCode` values for historical bookings or set temporary placeholders to satisfy the new NOT NULL + unique constraint.
 - Update application code to use `itineraryId` for itinerary structure queries and to create bookings linked to itineraries.
+
+### Post-migration sanity check
+- Run `npx ts-node -r tsconfig-paths/register scripts/db-sanity-check.ts` to confirm bookings link to itineraries and booking sequences exist.
+- Expected output: counts for bookings and itineraries, latest booking summary (if data exists), and a list of `BookingSequence` rows by year.
