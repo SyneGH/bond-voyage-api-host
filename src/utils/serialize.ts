@@ -138,3 +138,49 @@ export const serializeBooking = (
     ownership,
   };
 };
+
+export type UserDTO = {
+  id: string;
+  email: string;
+  password?: never;
+  refreshTokens?: never;
+  firstName?: string | null;
+  middleName?: string | null;
+  lastName?: string | null;
+  birthday: string | null;
+  employeeId?: string | null;
+  mobile: string;
+  role: User["role"];
+  avatarUrl?: string | null;
+  companyName?: string | null;
+  customerRating?: number | null;
+  yearsInOperation?: number | null;
+  isActive?: boolean;
+  lastLogin: string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+};
+
+export const serializeUser = (user?: User | null): UserDTO | null => {
+  if (!user) return null;
+
+  return {
+    id: user.id,
+    email: user.email,
+    firstName: user.firstName,
+    middleName: user.middleName,
+    lastName: user.lastName,
+    birthday: toISO(user.birthday),
+    employeeId: user.employeeId,
+    mobile: user.mobile,
+    role: user.role,
+    avatarUrl: user.avatarUrl,
+    companyName: user.companyName,
+    customerRating: decimalToNumber(user.customerRating),
+    yearsInOperation: user.yearsInOperation ?? null,
+    isActive: user.isActive,
+    lastLogin: toISO(user.lastLogin),
+    createdAt: toISO(user.createdAt),
+    updatedAt: toISO(user.updatedAt),
+  };
+};

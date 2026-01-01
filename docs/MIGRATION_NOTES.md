@@ -22,3 +22,33 @@ _To be updated alongside schema changes. Capture applied migrations, backfill st
   - Populate booking `destination/startDate/endDate/travelers` using the linked itinerary data when present.
   - Seed collaborator `invitedById` with the itinerary owner for existing records if needed.
   - Ensure `booking_sequences.lastIssuedCode` aligns with the latest generated booking code per year.
+
+## 20260210120000_phase_g2_faq_entry
+- **Change set:** Adds `faq_entries` table for persistent FAQs used by Roameo RAG.
+- **Apply:**
+  ```bash
+  npx prisma migrate deploy
+  ```
+- **Verification:**
+  ```bash
+  npx prisma db pull
+  npx prisma studio # confirm faq_entries rows
+  ```
+- **Backfill guidance:**
+  - Run `npm run db:seed` to upsert default FAQ entries.
+  - Ensure `faq_entries.isActive` is true for visible entries; inactive rows are ignored by the chatbot.
+
+## 20260214000000_phase_h_years_in_operation
+- **Change set:** Adds nullable `yearsInOperation` integer column to `users` for organizer tenure.
+- **Apply:**
+  ```bash
+  npx prisma migrate deploy
+  ```
+- **Verification:**
+  ```bash
+  npx prisma db pull
+  npx prisma studio # confirm users.yearsInOperation exists
+  ```
+- **Backfill guidance:**
+  - Optional: populate `yearsInOperation` for existing organizers; leave null if unknown.
+  - Ensure any API clients expecting the field handle null values.

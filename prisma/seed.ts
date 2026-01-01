@@ -22,6 +22,28 @@ const ITINERARY_ID = "00000000-0000-0000-0000-0000000000ab";
 const BOOKING_YEAR = new Date().getFullYear();
 const BOOKING_CODE = `BV-${BOOKING_YEAR}-001`;
 
+const FAQ_ENTRIES = [
+  {
+    id: "00000000-0000-0000-0000-00000000f001",
+    question: "How do I create a booking?",
+    answer:
+      "Create or select an itinerary, then submit a booking request. Only the itinerary owner can convert it to a booking.",
+    order: 1,
+  },
+  {
+    id: "00000000-0000-0000-0000-00000000f002",
+    question: "How do I upload a payment receipt?",
+    answer: "Open your booking details and use the payment upload section to attach your receipt.",
+    order: 2,
+  },
+  {
+    id: "00000000-0000-0000-0000-00000000f003",
+    question: "Can collaborators edit my itinerary?",
+    answer: "Yes, collaborators can edit the itinerary plan, but only the owner can place bookings.",
+    order: 3,
+  },
+];
+
 async function main() {
   console.log("🌱 Starting database seeding...");
 

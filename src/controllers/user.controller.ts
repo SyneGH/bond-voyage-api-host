@@ -20,6 +20,7 @@ import { dashboardStatsQueryDto } from "@/validators/dashboard.dto";
 import { DashboardService } from "@/services/dashboard.service";
 import { activityLogListQueryDto } from "@/validators/activity-log.dto";
 import { ActivityLogService } from "@/services/activity-log.service";
+import { serializeUser } from "@/utils/serialize";
 
 class UserController {
   // Cache TTL constants (in seconds)
@@ -110,7 +111,7 @@ class UserController {
       const user = await userService.createWithLog(authUser.userId, payload);
 
       createResponse(res, HTTP_STATUS.CREATED, "User registered successfully", {
-        user: userService.transformUser(user),
+        user: serializeUser(user),
       });
     } catch (error) {
       if (error instanceof ZodError) {
@@ -245,7 +246,7 @@ class UserController {
 
       // 6. Transform Data
       const transformedUsers = users.map((user: any) => ({
-        ...userService.transformUser(user),
+        ...serializeUser(user),
         dateFrom: user.bookings[0]?.startDate || null,
         dateTo: user.bookings[0]?.endDate || null,
       }));
@@ -325,9 +326,7 @@ class UserController {
         throwError(HTTP_STATUS.NOT_FOUND, "User not found");
       }
 
-      const transformedUser = userService.transformUser(
-        user as NonNullable<typeof user>
-      );
+      const transformedUser = serializeUser(user as NonNullable<typeof user>);
 
       try {
         await redis.setex(
@@ -371,7 +370,7 @@ class UserController {
 
       const updatedUser = user as NonNullable<typeof user>;
       createResponse(res, HTTP_STATUS.OK, "User updated successfully", {
-        user: userService.transformUser(updatedUser),
+        user: serializeUser(updatedUser),
       });
     } catch (error) {
       if (error instanceof ZodError) {
@@ -405,7 +404,7 @@ class UserController {
       await this.invalidateUserCaches(authUser.userId);
 
       createResponse(res, HTTP_STATUS.OK, "Profile updated successfully", {
-        user: userService.transformUser(user as NonNullable<typeof user>),
+        user: serializeUser(user as NonNullable<typeof user>),
       });
     } catch (error) {
       if (error instanceof ZodError) {

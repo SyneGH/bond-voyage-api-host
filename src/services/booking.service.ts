@@ -175,9 +175,6 @@ export const BookingService = {
       }
 
       const isOwner = itinerary.userId === data.userId;
-      const isCollaborator = itinerary.collaborators?.some(
-        (collab) => collab.userId === data.userId
-      );
       const isAdmin = data.role === Role.ADMIN;
 
       if (!isOwner && !isAdmin) {

@@ -19,6 +19,7 @@ import {
   sendOtpDto,
   verifyOtpDto,
 } from "@/validators/auth.dto";
+import { serializeUser } from "@/utils/serialize";
 
 class AuthController {
   // =====================================================
@@ -45,15 +46,7 @@ class AuthController {
       });
 
       createResponse(res, HTTP_STATUS.CREATED, "Registration successful", {
-        user: {
-          id: authUser.id,
-          email: authUser.email,
-          firstName: authUser.firstName,
-          lastName: authUser.lastName,
-          mobile: authUser.mobile,
-          role: authUser.role,
-          companyName: authUser.companyName,
-        },
+        user: serializeUser(authUser),
         accessToken,
       });
     } catch (error) {
@@ -91,19 +84,9 @@ class AuthController {
         sameSite: isProduction ? "none" : "lax",
         maxAge: toMilliseconds(7, "day"),
       });
-      
+
       createResponse(res, HTTP_STATUS.OK, "Login successful", {
-        user: {
-          id: authUser.id,
-          email: authUser.email,
-          firstName: authUser.firstName,
-          lastName: authUser.lastName,
-          mobile: authUser.mobile,
-          role: authUser.role,
-          avatarUrl: authUser.avatarUrl,
-          companyName: authUser.companyName,
-          customerRating: authUser.customerRating,
-        },
+        user: serializeUser(authUser),
         accessToken,
         refreshToken
       });
@@ -255,7 +238,9 @@ class AuthController {
     try {
       const user = await authService.getProfile(req.user!.userId);
 
-      createResponse(res, HTTP_STATUS.OK, "Profile retrieved", { user });
+      createResponse(res, HTTP_STATUS.OK, "Profile retrieved", {
+        user: serializeUser(user),
+      });
     } catch (error) {
       if (error instanceof AppError) {
         throw error;

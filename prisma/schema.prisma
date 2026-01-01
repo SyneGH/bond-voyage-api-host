@@ -119,6 +119,7 @@ model User {
   // Admin Specific Fields
   companyName    String?
   customerRating Decimal? @db.Decimal(3, 2)
+  yearsInOperation Int?
 
   // Relations
   bookings              Booking[]
