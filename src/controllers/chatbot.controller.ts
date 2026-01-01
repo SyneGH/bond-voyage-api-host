@@ -1,16 +1,16 @@
 import { Request, Response } from "express";
 import { ZodError } from "zod";
 import { ChatbotService } from "@/services/chatbot.service";
-import { chatbotMessageDto } from "@/validators/chatbot.dto";
+import { roamanPromptDto, roameoQuestionDto } from "@/validators/chatbot.dto";
 import { AppError, createResponse, throwError } from "@/utils/responseHandler";
 import { HTTP_STATUS } from "@/constants/constants";
 
 export const ChatbotController = {
   roameo: async (req: Request, res: Response): Promise<void> => {
     try {
-      const payload = chatbotMessageDto.parse(req.body);
-      const response = ChatbotService.respondRoameo(payload.message);
-      createResponse(res, HTTP_STATUS.OK, "Roameo response", { message: response });
+      const payload = roameoQuestionDto.parse(req.body);
+      const response = await ChatbotService.roameo(payload.question);
+      createResponse(res, HTTP_STATUS.OK, "Roameo response", response);
     } catch (error) {
       if (error instanceof ZodError) {
         throwError(HTTP_STATUS.BAD_REQUEST, "Validation failed", error.errors);
@@ -24,19 +24,13 @@ export const ChatbotController = {
 
   roaman: async (req: Request, res: Response): Promise<void> => {
     try {
-      const payload = chatbotMessageDto.parse(req.body);
-      const response = await ChatbotService.respondRoaman(
-        payload.message,
-        payload.context
+      const payload = roamanPromptDto.parse(req.body);
+      const response = await ChatbotService.roaman(
+        payload.prompt,
+        payload.preferences
       );
-      const responseMessage =
-        response &&
-        typeof response === "object" &&
-        "fallback" in response &&
-        response.fallback
-          ? "Roaman fallback response"
-          : "Roaman response";
-      createResponse(res, HTTP_STATUS.OK, responseMessage, response);
+
+      createResponse(res, HTTP_STATUS.OK, "Roaman response", response);
     } catch (error: any) {
       if (error instanceof ZodError) {
         throwError(HTTP_STATUS.BAD_REQUEST, "Validation failed", error.errors);

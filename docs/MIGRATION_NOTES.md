@@ -1,17 +1,39 @@
 # MIGRATION_NOTES
 
-## 2025-12-31: Itinerary + Booking split
-- Added `Itinerary` and `ItineraryCollaborator` tables to own planning data and collaborators independently of transactional bookings.
-- Moved itinerary structure to reference `Itinerary` (`itinerary_days` and `activities` now cascade from itineraries).
-- Refactored `Booking` to reference `Itinerary`, added unique `bookingCode`, and defaulted status to `PENDING` for transactional flows.
-- Introduced `BookingSequence` to track yearly booking code counters.
-- Dropped legacy `booking_collaborators` relation and added optional itinerary linkage on `inquiries`.
+_To be updated alongside schema changes. Capture applied migrations, backfill steps, and verification commands._
 
-### Deployment considerations
-- Existing data must be migrated: move booking-owned itinerary rows into the new `itineraries` table before applying the schema changes; otherwise foreign-key constraints will fail.
-- Generate `bookingCode` values for historical bookings or set temporary placeholders to satisfy the new NOT NULL + unique constraint.
-- Update application code to use `itineraryId` for itinerary structure queries and to create bookings linked to itineraries.
+## 20250204120000_phase_b_itinerary_booking_refactor
+- **Change set:**
+  - Added `RequestStatus` enum to support requested itinerary flow tracking.
+  - Itinerary gains `requestedStatus`, `sentAt`, and `confirmedAt` to record request/confirm timestamps.
+  - Itinerary collaborators now track `invitedById` for auditability of collaborator additions.
+  - Booking records capture `destination`, `startDate`, `endDate`, and `travelers` as transactional snapshots.
+  - Booking sequences store the last issued code for visibility/backfill.
+- **Apply:**
+  ```bash
+  npx prisma migrate deploy
+  ```
+- **Verification:**
+  ```bash
+  npx prisma db pull
+  npx prisma studio # optional to inspect itineraries/bookings/booking_sequences
+  ```
+- **Backfill guidance:**
+  - Populate booking `destination/startDate/endDate/travelers` using the linked itinerary data when present.
+  - Seed collaborator `invitedById` with the itinerary owner for existing records if needed.
+  - Ensure `booking_sequences.lastIssuedCode` aligns with the latest generated booking code per year.
 
-### Post-migration sanity check
-- Run `npx ts-node -r tsconfig-paths/register scripts/db-sanity-check.ts` to confirm bookings link to itineraries and booking sequences exist.
-- Expected output: counts for bookings and itineraries, latest booking summary (if data exists), and a list of `BookingSequence` rows by year.
+## 20260210120000_phase_g2_faq_entry
+- **Change set:** Adds `faq_entries` table for persistent FAQs used by Roameo RAG.
+- **Apply:**
+  ```bash
+  npx prisma migrate deploy
+  ```
+- **Verification:**
+  ```bash
+  npx prisma db pull
+  npx prisma studio # confirm faq_entries rows
+  ```
+- **Backfill guidance:**
+  - Run `npm run db:seed` to upsert default FAQ entries.
+  - Ensure `faq_entries.isActive` is true for visible entries; inactive rows are ignored by the chatbot.

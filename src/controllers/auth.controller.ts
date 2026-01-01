@@ -14,6 +14,7 @@ import { ZodError } from "zod";
 import {
   loginDto,
   registerDto,
+  refreshTokenDto,
   resetPasswordDto,
   sendOtpDto,
   verifyOtpDto,
@@ -124,7 +125,14 @@ class AuthController {
   // =====================================================
   public refreshToken = async (req: Request, res: Response): Promise<void> => {
     try {
-      const refreshToken = req.cookies.refreshToken;
+      const parsed = refreshTokenDto.safeParse(req.body);
+      if (!parsed.success && req.body && "refreshToken" in req.body) {
+        throwError(HTTP_STATUS.UNAUTHORIZED, "Invalid or expired refresh token");
+      }
+
+      const refreshToken = parsed.success
+        ? parsed.data.refreshToken
+        : req.cookies.refreshToken;
 
       if (!refreshToken) {
         throwError(HTTP_STATUS.UNAUTHORIZED, "Refresh token required");

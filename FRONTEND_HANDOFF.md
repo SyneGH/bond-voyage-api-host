@@ -55,7 +55,7 @@ Authorization: Bearer <accessToken>
 
 3) **Refresh token**
 ```
-POST /auth/refresh-token
+POST /auth/refresh
 ```
 - Uses the `refreshToken` cookie.
 - Returns a **new access token**.
@@ -192,7 +192,7 @@ If missing, endpoints return `400` with a `missing` key.
 | --- | --- | --- | --- | --- | --- | --- |
 | POST | `/auth/register` | Public | Register user | body | `data.user`, `data.accessToken` | sets refresh cookie |
 | POST | `/auth/login` | Public | Login | body | `data.user`, `data.accessToken` | sets refresh cookie |
-| POST | `/auth/refresh-token` | Public (cookie) | Refresh access token | cookie | `data.accessToken` | - |
+| POST | `/auth/refresh` | Public (cookie/body) | Refresh access token | cookie or body `refreshToken` | `data.accessToken` | - |
 | POST | `/auth/reset-password` | Public | Reset with OTP | body | success | requires OTP in Redis |
 | POST | `/auth/send-otp` | Public | Send OTP | body | success | requires Brevo API key |
 | POST | `/auth/verify-otp` | Public | Verify OTP | body | success | - |
@@ -780,7 +780,7 @@ curl https://bond-voyage-api-host.onrender.com/api/v1/auth/profile \
 ## 12) Troubleshooting & Gotchas
 - **401**: missing/invalid token. Re-login or refresh token.
 - **403**: role restriction or ownership violation.
-- **Token expired**: call `/auth/refresh-token`, then retry with new access token.
+- **Token expired**: call `/auth/refresh`, then retry with new access token.
 - **External API keys missing**: weather/route/chatbot return 400 with `{ missing: "KEY" }`.
 - **Large base64 uploads**: proof images must be **≤ 5MB** and body limit is `8mb`.
 
