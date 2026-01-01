@@ -109,38 +109,16 @@ export const ActivityLogService = {
 
     const where = {
       ...(actorId ? { userId: actorId } : {}),
-      ...(action
-        ? {
-            action: {
-              contains: action,
-              mode: "insensitive" as const,
-            },
-          }
-        : {}),
-      ...(entityType
-        ? {
-            details: {
-              contains: `"entityType":"${entityType}"`,
-              mode: "insensitive" as const,
-            },
-          }
-        : {}),
-      ...(entityId
-        ? {
-            details: {
-              contains: `"entityId":"${entityId}"`,
-              mode: "insensitive" as const,
-            },
-          }
-        : {}),
-      ...(dateFrom || dateTo
-        ? {
-            timestamp: {
-              gte: dateFrom,
-              lte: dateTo,
-            },
-          }
-        : {}),
+      ...(action ? { action: { contains: action, mode: "insensitive" as const } } : {}),
+      // Improved filtering for the stringified JSON "details" column
+      ...(entityType ? { details: { contains: `"entityType":"${entityType}"` } } : {}),
+      ...(entityId ? { details: { contains: `"entityId":"${entityId}"` } } : {}),
+      ...(dateFrom || dateTo ? {
+        timestamp: {
+          gte: dateFrom ? new Date(dateFrom) : undefined,
+          lte: dateTo ? new Date(dateTo) : undefined,
+        },
+      } : {}),
     };
 
     const [items, total] = await prisma.$transaction([
