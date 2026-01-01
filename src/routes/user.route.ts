@@ -9,8 +9,8 @@ const router = Router();
 // All user routes require authentication
 router.use(authenticate);
 
-// User profile routes
-router.put("/profile", asyncHandler(userController.updateProfile));
+// All user profile routes
+router.patch("/profile", asyncHandler(userController.updateProfile));
 router.put("/change-password", asyncHandler(userController.changePassword));
 router.get("/me/stats", asyncHandler(userController.getMyStats));
 router.get("/me/activity-logs", asyncHandler(userController.getMyActivityLogs));
