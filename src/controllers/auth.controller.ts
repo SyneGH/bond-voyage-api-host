@@ -125,22 +125,33 @@ class AuthController {
   // =====================================================
   public refreshToken = async (req: Request, res: Response): Promise<void> => {
     try {
-      const parsed = refreshTokenDto.safeParse(req.body);
-      if (!parsed.success && req.body && "refreshToken" in req.body) {
-        throwError(HTTP_STATUS.UNAUTHORIZED, "Invalid or expired refresh token");
-      }
+      let refreshToken: string | undefined;
 
-      const refreshToken = parsed.success
-        ? parsed.data.refreshToken
-        : req.cookies.refreshToken;
+      // 1) Check Body Strictly (only if key exists)
+      if (req.body && Object.prototype.hasOwnProperty.call(req.body, "refreshToken")) {
+        const parsed = refreshTokenDto.safeParse(req.body);
+
+        if (!parsed.success) {
+          throwError(HTTP_STATUS.BAD_REQUEST, "Invalid refresh token format");
+          return;
+        }
+
+        refreshToken = parsed.data.refreshToken;
+      } else {
+        // 2) Fallback to Cookie
+        refreshToken = req.cookies?.refreshToken;
+      }
 
       if (!refreshToken) {
         throwError(HTTP_STATUS.UNAUTHORIZED, "Refresh token required");
+        return;
       }
 
       const tokenPayload = await authService.refreshToken(refreshToken);
-      const isProduction = process.env.NODE_ENV === "production";
 
+      // Optional: only set cookie if you truly manage cookie refresh here
+      // If you do NOT rotate refresh tokens, you can omit this cookie write entirely.
+      const isProduction = process.env.NODE_ENV === "production";
       res.cookie("refreshToken", refreshToken, {
         httpOnly: true,
         secure: isProduction,
@@ -152,10 +163,8 @@ class AuthController {
         accessToken: tokenPayload.accessToken,
       });
     } catch (error) {
-      if (error instanceof AppError) {
-        throw error;
-      }
-      throwError(HTTP_STATUS.UNAUTHORIZED, "Invalid or expired refresh token");
+      if (error instanceof AppError) throw error;
+      throwError(HTTP_STATUS.INTERNAL_SERVER_ERROR, "Internal Server Error");
     }
   };
 

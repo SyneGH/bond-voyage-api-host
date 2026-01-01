@@ -180,7 +180,7 @@ export const BookingService = {
       );
       const isAdmin = data.role === Role.ADMIN;
 
-      if (!isOwner && !isCollaborator && !isAdmin) {
+      if (!isOwner && !isAdmin) {
         throw new Error("ITINERARY_FORBIDDEN");
       }
 
