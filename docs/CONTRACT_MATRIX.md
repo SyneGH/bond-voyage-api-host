@@ -1,25 +1,55 @@
 # CONTRACT_MATRIX
 
-Endpoint contracts, required fields, and current gaps.
+Canonical request/response contracts for frontend integration. All responses use the envelope `{ success, message, data?, meta? }` with ISO date strings and numeric decimals.
 
-| Endpoint | Current Request/Response | Required Fields | Gap to Address |
-| --- | --- | --- | --- |
-| POST `/api/bookings` | Accepts `{ itineraryId, totalPrice, type?, tourType? }` (preferred) or a deprecated inline itinerary payload; response includes bookingCode and itinerary snapshot. | bookingCode (BV-YEAR-NUMBER with 3-digit padding), itineraryId linkage, normalized ISO dates/times, itinerary vs booking separation | Inline itinerary creation remains for backward compatibility; ensure itinerary access control (owner/collaborator/admin) and surface bookingCode in DTOs. |
-| GET `/api/bookings/:id` | Returns booking with user, payments, collaborators, itinerary days/activities; ownership check allows owner/collaborators/admin. | bookingCode, itinerary status/type fields, normalized dates, notification payload for status changes | bookingCode absent; date fields returned as raw Date objects; no DTO enforcing required fields for frontend. |
-| GET `/api/bookings/admin/bookings` | Admin list returns flattened rows (customer, destination, dates string via `split('T')[0]`, total, rejection fields, status). | bookingCode, itinerary reference, consistent ISO dates, payment status badges, itinerary/booking type distinctions | Booking code not included; date formatting inconsistent; lacks itinerary linkage and SMART_TRIP/REQUESTED flow context. |
-| PATCH `/api/bookings/:id/status` | Accepts `{ status, rejectionReason?, rejectionResolution? }`; transitions validated in service. | audit/notification payload, bookingCode in responses, actor attribution | No structured notification emitted; response not normalized to DTO with bookingCode. |
-| POST `/api/auth/refresh` | Accepts `{ refreshToken }` in body or cookie fallback; returns `{ accessToken }`. | Body token precedence over cookie for mobile/SPA; validator enforced; 401 on missing/invalid | Implemented. |
-| GET `/api/weather/forecast` | Returns normalized shape `{lat,lng,unit,forecast:[{date,temperatureC,description}]}` with mock fallback when no API key. | Stable forecast array structure, normalized date strings, location metadata | Implemented normalization/mocks. |
-| GET `/api/faqs` | Returns DB-backed FAQs (`FaqEntry`) ordered by `order` with fallback stub if table empty. | id, question, answer, order fields in stable array | Implemented with Prisma model + seed. |
-| POST `/api/upload/itinerary-thumbnail` | Accepts `{ url }` JSON or multipart file; returns `{ url }` (placeholder when storage absent). | file/URL payload, validation, returned thumbnail URL | Implemented stub with placeholder URL. |
-| GET `/api/users/me/activity-logs` | Returns paginated activity logs scoped to the authenticated user with optional type/date filters; admin `/activity-logs` remains for full access. | scoped activity entries for authenticated user, pagination meta | Implemented. |
-| GET `/api/users/me/stats` | Returns booking stats for the authenticated user with trend/distribution cards; card counts currently zeroed per product ask. | user profile snippet, cards (total/pending/active/completed), trend labels, status/type distributions | Cards intentionally zeroed; trends/distributions remain. |
-| POST `/api/chatbots/roameo` | `{ question }` -> Gemini-backed FAQ RAG response `{answer,confidence,sources[]}` using `FaqEntry` keyword search. | Requires GEMINI_API_KEY, GEMINI_MODEL (default `gemini-1.5-flash`); strict FAQ-only answers | Implemented; returns 501 if Gemini key missing. |
-| POST `/api/chatbots/roaman` | `{ prompt, preferences? }` -> friendly message + SMART_TRIP draft JSON (no DB writes). | GEMINI_API_KEY/GEMINI_MODEL envs; draft shape compatible with itinerary days/activities | Implemented; best-effort JSON repair; 501 if Gemini key missing. |
-| GET `/api/notifications` | Returns `{ items: NotificationDTO[], meta }` with pagination and optional `isRead` filter. | ISO timestamps, validated payloads per type, data payload persisted | Implemented; mark-read/read-all supported. |
-
-## Phase D updates
-- Added itinerary endpoints (CRUD, send/confirm) returning ItineraryDTO with ISO dates and numeric costs.
-- Bookings return BookingDTO with BV codes, ownership, paymentStatus, itinerary nested days/activities.
-- Weather forecast normalized to {lat,lng,unit,forecast[]} shape.
-- FAQ endpoint serves stub list; upload thumbnail returns URL payload.
+| Endpoint | Auth | Request (minimal) | Response (minimal) | Notes |
+| --- | --- | --- | --- | --- |
+| POST `/auth/login` | None | `{ email, password }` | `{ user, accessToken, refreshToken }` | Sets `refreshToken` cookie; user includes `yearsInOperation` and ISO dates. |
+| POST `/auth/refresh` | Optional cookie | `{ refreshToken }` (body preferred) | `{ accessToken }` | Body token takes precedence over cookie. |
+| GET `/auth/profile` | Bearer | — | `{ user }` | Self profile. |
+| PATCH `/users/profile` | Bearer | Profile fields incl. `yearsInOperation` | `{ user }` | Self update. |
+| GET `/users/me/stats` | Bearer | — | `{ cards, trends, distributions }` | Cards currently zeroed per product request. |
+| GET `/users/me/activity-logs` | Bearer | `?page&limit&action&dateFrom&dateTo` | `{ items: ActivityLogDTO[], meta }` | Self-scope logs. |
+| POST `/users` | Admin | `{ name,email,password,role }` | `{ user }` | Admin create. |
+| GET `/users` | Admin | `?search&role&isActive&dateFrom&dateTo&page&limit` | `{ items: UserDTO[], meta }` | Excludes admin users by design. |
+| GET `/users/:id` | Admin | — | `{ user }` | Admin fetch. |
+| PATCH `/users/:id` | Admin | Partial user fields | `{ user }` | — |
+| PATCH `/users/:id/deactivate` | Admin | — | `{ user }` | Soft deactivate. |
+| DELETE `/users/:id` | Admin | — | `{ message }` | Hard delete. |
+| POST `/itineraries` | Bearer | `{ destination, travelers, startDate, endDate, days[] }` | `{ itinerary }` | Days include ordered activities; dates ISO. |
+| GET `/itineraries` | Bearer | `?page&limit&search&status&type` | `{ items: ItineraryDTO[], meta }` | Caller-owned itineraries. |
+| GET `/itineraries/:id` | Bearer | — | `{ itinerary }` | Includes collaborators/days/activities. |
+| PATCH `/itineraries/:id` | Bearer | Partial itinerary fields | `{ itinerary }` | Owner/collaborator access control. |
+| DELETE `/itineraries/:id` | Bearer | — | `{ message }` | Archive/delete per service rules. |
+| PATCH `/itineraries/:id/send` | Bearer | `{ sentAt? }` | `{ itinerary }` | Requested flow stub; marks sent. |
+| PATCH `/itineraries/:id/confirm` | Bearer | `{ confirmedAt? }` | `{ itinerary }` | Requested flow stub; owner confirm. |
+| POST `/itineraries/:id/collaborators` | Bearer | `{ userId }` | `{ collaborator }` | Inviter recorded; collaborator can edit itinerary. |
+| GET `/itineraries/:id/collaborators` | Bearer | — | `{ items: CollaboratorDTO[] }` | — |
+| DELETE `/itineraries/:id/collaborators/:userId` | Bearer | — | `{ message }` | Removes collaborator. |
+| POST `/bookings` | Bearer (owner/admin) | `{ itineraryId, totalPrice, type?, tourType? }` (legacy inline itinerary allowed) | `{ booking }` | Generates `bookingCode` BV-YYYY-NNN; captures itinerary snapshot. |
+| GET `/bookings/:id` | Bearer | — | `{ booking }` | Owner/admin; collaborators see if attached/requested. |
+| PUT `/bookings/:id` | Bearer | Partial booking/itinerary fields | `{ booking }` | Draft edits with collaborator rules. |
+| PATCH `/bookings/:id/submit` | Bearer | — | `{ booking }` | Submits booking. |
+| PATCH `/bookings/:id/cancel` | Bearer | — | `{ booking }` | Cancels booking. |
+| DELETE `/bookings/:id` | Bearer | — | `{ message }` | Deletes draft. |
+| GET `/bookings/my-bookings` | Bearer | `?page&limit&status` | `{ items: BookingDTO[], meta }` | Caller-owned bookings. |
+| GET `/bookings/shared-with-me` | Bearer | `?page&limit` | `{ items: BookingDTO[], meta }` | Collaborator-shared bookings. |
+| POST `/bookings/:id/collaborators` | Bearer | `{ userId }` | `{ collaborator }` | Booking-level collaborators. |
+| GET `/bookings/:id/collaborators` | Bearer | — | `{ items: CollaboratorDTO[] }` | — |
+| DELETE `/bookings/:id/collaborators/:collaboratorUserId` | Bearer | — | `{ message }` | — |
+| PATCH `/bookings/:id/status` | Admin | `{ status, rejectionReason?, rejectionResolution? }` | `{ booking }` | Admin approve/reject; notifications emitted. |
+| GET `/bookings/admin/bookings` | Admin | `?status&page&limit&search` | `{ items: BookingDTO[], meta }` | Flattened admin view. |
+| POST `/bookings/:id/payments` | Bearer | `{ amount, method, reference?, attachmentUrl? }` | `{ payment }` | Delegates to payment controller. |
+| GET `/bookings/:id/payments` | Bearer | — | `{ items: PaymentDTO[] }` | — |
+| POST `/payments/:id` | Bearer | `{ amount, method, reference?, attachmentUrl? }` | `{ payment }` | Equivalent payment submit. |
+| GET `/payments` | Bearer | `?bookingId&page&limit` | `{ items: PaymentDTO[], meta }` | Admin filters available in service. |
+| GET `/payments/:id/proof` | Bearer | — | File/stream or `{ url }` | Proof retrieval. |
+| PATCH `/payments/:id/status` | Admin | `{ status, rejectionReason? }` | `{ payment }` | Verify/reject; emits notifications. |
+| GET `/notifications` | Bearer | `?isRead&page&limit` | `{ items: NotificationDTO[], meta }` | Pagination meta reused. |
+| PATCH `/notifications/:id/read` | Bearer | — | `{ notification }` | Mark read. |
+| PATCH `/notifications/read-all` | Bearer | — | `{ count }` | Mark all read. |
+| POST `/chatbots/roameo` | None (public) | `{ question }` | `{ answer, confidence, sources[] }` | FAQ-only; returns 501 if Gemini key missing; rejects out-of-scope. |
+| POST `/chatbots/roaman` | None (public) | `{ prompt, preferences? }` | `{ message, draftItinerary }` | SMART_TRIP draft JSON, no DB write; 501 if Gemini key missing. |
+| GET `/activity-logs` | Admin | `?actorId&action&entityType&entityId&dateFrom&dateTo&page&limit` | `{ items: ActivityLogDTO[], meta }` | Action filter is substring-based; legacy strings may not match enums. |
+| GET `/activity-logs/:id` | Admin | — | `{ activityLog }` | — |
+| GET `/health` | None | — | `{ status: 'ok' }` | Liveness. |
