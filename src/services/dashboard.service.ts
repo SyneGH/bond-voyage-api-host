@@ -1,5 +1,5 @@
 import { prisma } from "@/config/database";
-import { BookingStatus, BookingType } from "@prisma/client";
+import { BookingStatus, BookingType, Prisma } from "@prisma/client";
 
 const MONTH_LABELS = [
   "Jan",
@@ -172,6 +172,150 @@ export const DashboardService = {
         activeBookings,
         completedTrips,
         faqsCard: 0
+      },
+      trends: {
+        year,
+        labels: buildTrendLabels(year),
+        historical,
+        predicted,
+      },
+      distributions: {
+        status: statusDistribution,
+        type: typeDistribution,
+      },
+    };
+  },
+  async getSelfStats(year: number, userId: string) {
+    const userScope: Prisma.BookingWhereInput = {
+      OR: [
+        { userId },
+        { itinerary: { collaborators: { some: { userId } } } },
+      ],
+    };
+
+    const userProfile = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { firstName: true, lastName: true, avatarUrl: true, email: true },
+    });
+
+    const yearStart = new Date(Date.UTC(year, 0, 1));
+    const nextYearStart = new Date(Date.UTC(year + 1, 0, 1));
+
+    const bookingsInYear = await prisma.booking.findMany({
+      where: {
+        ...userScope,
+        startDate: {
+          gte: yearStart,
+          lt: nextYearStart,
+        },
+      },
+      select: { startDate: true },
+    });
+
+    const historical = Array.from({ length: 12 }, () => 0);
+    bookingsInYear.forEach((booking) => {
+      if (!booking.startDate) return;
+
+      const monthIndex = booking.startDate.getUTCMonth();
+      if (monthIndex >= 0 && monthIndex < 12) {
+        historical[monthIndex] += 1;
+      }
+    });
+
+    const { slope, intercept } = computeLinearRegression(historical);
+    const predicted = Array.from({ length: 6 }, (_, index) => {
+      const xValue = 13 + index;
+      const value = slope * xValue + intercept;
+      return Math.max(0, Math.round(value));
+    });
+
+    const statusGroups = await prisma.booking.groupBy({
+      by: ["status"],
+      _count: { _all: true },
+      where: {
+        ...userScope,
+        status: { in: ACTIVE_STATUSES },
+      },
+    });
+
+    const statusDistribution = {
+      completed: 0,
+      pending: 0,
+      active: 0,
+      cancelled: 0,
+    };
+
+    const extractCount = (group: { _count?: unknown }) => {
+      if (typeof group._count === "object" && group._count !== null) {
+        const maybeCount = (group._count as { _all?: number })._all;
+        return typeof maybeCount === "number" ? maybeCount : 0;
+      }
+      return 0;
+    };
+
+    statusGroups.forEach((group) => {
+      const count = extractCount(group);
+      switch (group.status) {
+        case "COMPLETED":
+          statusDistribution.completed = count;
+          break;
+        case "PENDING":
+          statusDistribution.pending = count;
+          break;
+        case "CONFIRMED":
+          statusDistribution.active = count;
+          break;
+        case "CANCELLED":
+          statusDistribution.cancelled = count;
+          break;
+        default:
+          break;
+      }
+    });
+
+    const typeGroups = await prisma.booking.groupBy({
+      by: ["type"],
+      _count: { _all: true },
+      where: {
+        ...userScope,
+        status: { in: ACTIVE_STATUSES },
+      },
+    });
+
+    const typeDistribution: Record<
+      "standard" | "requested" | "customized",
+      number
+    > = {
+      standard: 0,
+      requested: 0,
+      customized: 0,
+    };
+
+    typeGroups.forEach((group) => {
+      const count = extractCount(group);
+      switch (group.type) {
+        case "STANDARD":
+          typeDistribution.standard = count;
+          break;
+        case "REQUESTED":
+          typeDistribution.requested = count;
+          break;
+        case "CUSTOMIZED":
+          typeDistribution.customized = count;
+          break;
+        default:
+          break;
+      }
+    });
+
+    return {
+      user: userProfile,
+      cards: {
+        totalBookings: 0,
+        pendingApprovals: 0,
+        activeBookings: 0,
+        completedTrips: 0,
+        faqsCard: 0,
       },
       trends: {
         year,
