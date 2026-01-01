@@ -74,9 +74,9 @@ export const ChatbotService = {
       );
     });
 
-    if (sources.length === 0 && faqs.length === 0) {
+    if (sources.length === 0) {
       return {
-        answer: "I don't have that info in our official FAQs yet.",
+        answer: "I'm not sure based on our official FAQs yet. Please contact support for help.",
         confidence: "low" as const,
         sources: [],
       };
@@ -89,7 +89,10 @@ export const ChatbotService = {
       )
       .join("\n\n");
 
-    const prompt = `You are Roameo, a strict FAQ bot. Answer ONLY from the provided context. If the answer is not in context, reply: "I don't have that info in our official FAQs yet." Context:\n${context}\n\nUser question: ${question}\nRespond concisely.`;
+    const prompt = `You are Roameo, a strict FAQ bot. 
+    Answer the user's question using ONLY the context provided below. 
+    If the answer is not explicitly in the context, do not make it up.
+    Context:\n${context}\n\nUser question: ${question}\nRespond concisely.`;
 
     const text = await callGemini(prompt);
 
@@ -119,8 +122,12 @@ export const ChatbotService = {
       contextLines.push(`User preferences: ${JSON.stringify(preferences)}`);
     }
 
-    const fullPrompt = `${contextLines.join("\n")}\nUser prompt: ${prompt}\nRespond ONLY with JSON matching {"message":"...","draft":{...}}`;
-
+    const fullPrompt = `
+    ${contextLines.join("\n")}
+    User prompt: ${prompt}
+    Respond ONLY with a valid JSON object matching the format: {"message":"string", "draft":{...}}. 
+    Do not wrap in markdown code blocks.`;
+    
     const text = await callGemini(fullPrompt);
 
     const fallbackDraft = {
