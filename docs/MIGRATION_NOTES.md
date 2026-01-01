@@ -1,69 +1,60 @@
 # MIGRATION_NOTES
 
-_To be updated alongside schema changes. Capture applied migrations, backfill steps, and verification commands._
+Use this log to apply/verify Prisma migrations and related backfills.
 
-## 20250204120000_phase_b_itinerary_booking_refactor
+## Apply Steps (all environments)
+1. Install deps: `npm install`
+2. Generate client: `npx prisma generate`
+3. Apply migrations: `npx prisma migrate deploy`
+4. Seed (optional, for FAQ/chatbots): `npm run db:seed`
+5. Build to ensure type safety: `npm run build`
+
+## Migration History
+
+### 20250204120000_phase_b_itinerary_booking_refactor
 - **Change set:**
-  - Added `RequestStatus` enum to support requested itinerary flow tracking.
-  - Itinerary gains `requestedStatus`, `sentAt`, and `confirmedAt` to record request/confirm timestamps.
-  - Itinerary collaborators now track `invitedById` for auditability of collaborator additions.
-  - Booking records capture `destination`, `startDate`, `endDate`, and `travelers` as transactional snapshots.
-  - Booking sequences store the last issued code for visibility/backfill.
-- **Apply:**
-  ```bash
-  npx prisma migrate deploy
-  ```
+  - Added `RequestStatus` enum for requested itinerary tracking.
+  - Itinerary gains `requestedStatus`, `sentAt`, `confirmedAt`.
+  - `ItineraryCollaborator` tracks `invitedById`.
+  - Booking snapshots `destination/startDate/endDate/travelers`; booking sequences store last issued code.
 - **Verification:**
   ```bash
   npx prisma db pull
-  npx prisma studio # optional to inspect itineraries/bookings/booking_sequences
+  npx prisma studio # inspect itineraries/bookings/booking_sequences
   ```
-- **Backfill guidance:**
-  - Populate booking `destination/startDate/endDate/travelers` using the linked itinerary data when present.
-  - Seed collaborator `invitedById` with the itinerary owner for existing records if needed.
-  - Ensure `booking_sequences.lastIssuedCode` aligns with the latest generated booking code per year.
+- **Backfill:**
+  - Populate booking snapshot fields from linked itinerary.
+  - Seed `invitedById` with owner for existing collaborators.
+  - Align `booking_sequences.lastIssuedCode` with latest BV-YYYY-NNN per year.
 
-## 20260210120000_phase_g2_faq_entry
-- **Change set:** Adds `faq_entries` table for persistent FAQs used by Roameo RAG.
-- **Apply:**
-  ```bash
-  npx prisma migrate deploy
-  ```
+### 20260210120000_phase_g2_faq_entry
+- **Change set:** Adds `faq_entries` table for Roameo RAG.
 - **Verification:**
   ```bash
   npx prisma db pull
   npx prisma studio # confirm faq_entries rows
   ```
-- **Backfill guidance:**
-  - Run `npm run db:seed` to upsert default FAQ entries.
-  - Ensure `faq_entries.isActive` is true for visible entries; inactive rows are ignored by the chatbot.
+- **Backfill:** Run `npm run db:seed` to upsert default FAQ entries (`isActive` true).
 
-## 20260214000000_phase_h_years_in_operation
-- **Change set:** Adds nullable `yearsInOperation` integer column to `users` for organizer tenure.
-- **Apply:**
-  ```bash
-  npx prisma migrate deploy
-  ```
+### 20260214000000_phase_h_years_in_operation
+- **Change set:** Adds nullable `yearsInOperation` integer to `users`.
 - **Verification:**
   ```bash
   npx prisma db pull
   npx prisma studio # confirm users.yearsInOperation exists
   ```
-- **Backfill guidance:**
-  - Optional: populate `yearsInOperation` for existing organizers; leave null if unknown.
-  - Ensure any API clients expecting the field handle null values.
+- **Backfill:** Optionally populate `yearsInOperation`; allow null if unknown.
 
-## Phase F (Notifications)
-- **Change set:** No new tables; structured notification payload validation added with hooks for booking/payment/inquiry flows.
-- **Apply:**
-  ```bash
-  npx prisma migrate deploy
-  ```
+### Phase F (Notifications)
+- **Change set:** Structured payload validation for notifications; no schema change.
 - **Verification:**
   ```bash
-  # Ensure table exists (already present):
   npx prisma db pull
-  npx prisma studio # inspect notifications table for new rows after actions
+  npx prisma studio # ensure notifications appear after booking/payment actions
   ```
-- **Backfill guidance:**
-  - None required; existing notifications remain valid. New payload validation enforces typed data on inserts.
+- **Backfill:** None required.
+
+## Operational Notes
+- Booking codes use calendar-year sequences; if importing historical bookings, update `booking_sequences` accordingly.
+- Chatbot endpoints return 501 when Gemini env vars are absent; not a migration blocker.
+- No destructive migrations are present in this log; if adding future migrations, document downgrade/rollback expectations here.

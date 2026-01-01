@@ -1,20 +1,16 @@
 # ISSUE_MATRIX
 
-Maps each requirement to current repo state, impacted areas, and risks.
+Current requirement coverage, status, and residual risks.
 
-| Requirement | Current State | Impacted Areas | Notes / Risks |
+| Requirement | Status | Coverage Highlights | Residual Risk/Notes |
 | --- | --- | --- | --- |
-| Itinerary (planning) vs Booking (transaction) separation | Itinerary CRUD/collab endpoints exist; booking creation now requires owner (or admin) on the linked itinerary, snapshots plan data, and inline itinerary creation is deprecated but still available. | `prisma/schema.prisma`, `src/services/booking.service.ts`, `src/controllers/booking.controller.ts`, itinerary modules/routes | Collaborators cannot create bookings; ensure frontend uses itinerary-first flow before removing inline path. |
-| Four itinerary flows (STANDARD/CUSTOMIZED/REQUESTED/SMART_TRIP) | Validators/DTOs allow all types; REQUESTED send/confirm stubs exist; SMART_TRIP has no special logic beyond type flag and draft generation via chatbot. | Validators/DTOs, itinerary + booking controllers/services | Requested flow still stubbed; SMART_TRIP relies on Roaman draft output and manual creation. |
-| BV-YEAR-NUMBER bookingCode | Booking code generator issues BV-<YEAR>-<NNN> with padding 3 using transactional sequence upserts; seeding aligns sequences to current year codes. | `src/services/booking.service.ts`, Booking DTOs/responses, Prisma migrations, any scripts using BookingSequence | Maintain sequence correctness when backfilling legacy records; ensure DTO responses expose bookingCode consistently. |
-| Permissions fixes for self-scope (/users/me stats, activity logs) | Self endpoints added for stats and activity logs using authenticated user scope; admin dashboards/logs remain restricted. | `src/routes/user.route.ts`, `src/controllers/user.controller.ts`, `src/services/dashboard.service.ts`, `src/services/activity-log.service.ts` | Ensure self routes ignore foreign actorId; admin routes stay admin-only. |
-| Normalized date/time responses | Controllers return raw Date objects (e.g., booking listings) and format dates inconsistently (e.g., `split('T')[0]` in admin list). | Response DTOs/serializers, booking controllers/services, shared date utility | Align on ISO 8601 serialization; consider timezone handling to avoid frontend parsing issues. |
-| Missing endpoints (FAQ, upload thumbnail, weather forecast normalization) | FAQ now DB-backed via `FaqEntry` with seed + fallback stub; upload thumbnail stub returns URL; weather forecast normalized mock/live. | `src/controllers/faq.controller.ts`, `src/controllers/upload.controller.ts`, `src/controllers/weather.controller.ts`, Prisma migration/seed | FAQ relies on new migration; upload still placeholder storage. |
-| Notification payload corrections | Structured payload validation added; notifications emitted for booking creation/status, payment submission/status, and inquiries; pagination + mark-read endpoints exposed. | `src/services/notification.service.ts`, booking/payment/inquiry controllers, `src/controllers/notification.controller.ts` | Admin fan-out is best-effort (active admins only); no websocket push; RAG/vector search not used. |
-| Refresh token via request body | Refresh endpoint now accepts body token with cookie fallback and validation. | `src/controllers/auth.controller.ts`, auth routes/validators | Implemented; ensure clients send body or rely on cookie. |
-| Optional chatbot transport stub | Chatbot endpoints now use Gemini: Roameo (FAQ RAG) and Roaman (travel assistant draft JSON). No queue/transport yet. | `src/controllers/chatbot.controller.ts`, `src/services/chatbot.service.ts`, new env vars | RAG uses keyword search only; returns 501 when Gemini key missing. |
-
-## Phase D closures
-- Separated itinerary endpoints from bookings with collaborator support.
-- Booking DTOs normalized with ISO dates and numeric totals.
-- Added weather/faq/upload stubs to unblock frontend.
+| Itinerary vs Booking separation | Complete | Itinerary CRUD + collaborators; bookings require owner/admin on linked itinerary; snapshot stored on booking creation. | Legacy inline booking creation still supported for compatibility. |
+| Itinerary flows (STANDARD/CUSTOMIZED/REQUESTED/SMART_TRIP) | Partial (REQUESTED stub, SMART_TRIP assisted) | Types supported in validators/DTOs; requested send/confirm endpoints present; Roaman produces SMART_TRIP drafts. | Requested flow logic minimal; SMART_TRIP draft not persisted automatically. |
+| BV-YYYY-NNN booking codes | Complete | Transactional sequence per year in booking service; bookingCode returned in DTOs. | Keep sequence alignment during backfills; codes tied to calendar year. |
+| Permissions (self vs admin) | Complete | Self endpoints for stats/activity logs; admin user management/audits; booking/itinerary ownership enforced. | Ensure clients honor owner-only booking creation. |
+| ISO date/decimal serialization | Complete | Serializers return ISO strings; Prisma Decimal to number in DTOs. | Confirm new endpoints use serializers if added. |
+| FAQ/Upload/Weather stubs | Complete | FAQ backed by `FaqEntry` with seed; upload thumbnail stub returns URL; weather normalized with mock fallback. | Upload remains placeholder storage. |
+| Notifications lifecycle | Complete | Structured payload validation; emitted on booking/payment actions; pagination + mark-read endpoints. | No websocket push; relies on polling. |
+| Auth refresh via body-first | Complete | `/auth/refresh` accepts body token with cookie fallback; validators enforce presence. | None. |
+| Chatbots (Roameo/Roaman) | Complete (with env gating) | Gemini-backed; Roameo strict FAQ RAG; Roaman returns friendly message + SMART_TRIP JSON without DB writes. | Returns 501 if Gemini env missing; FAQ search keyword-based only. |
+| Auditing (Phase I) | Complete | Admin/global and self-scoped activity-log queries with pagination and filters. | Action filter substring-based; legacy strings may not match enum names. |
