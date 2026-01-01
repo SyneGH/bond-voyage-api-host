@@ -16,6 +16,7 @@ Endpoint contracts, required fields, and current gaps.
 | GET `/api/users/me/stats` | Returns booking stats for the authenticated user with trend/distribution cards; card counts currently zeroed per product ask. | user profile snippet, cards (total/pending/active/completed), trend labels, status/type distributions | Cards intentionally zeroed; trends/distributions remain. |
 | POST `/api/chatbots/roameo` | `{ question }` -> Gemini-backed FAQ RAG response `{answer,confidence,sources[]}` using `FaqEntry` keyword search. | Requires GEMINI_API_KEY, GEMINI_MODEL (default `gemini-1.5-flash`); strict FAQ-only answers | Implemented; returns 501 if Gemini key missing. |
 | POST `/api/chatbots/roaman` | `{ prompt, preferences? }` -> friendly message + SMART_TRIP draft JSON (no DB writes). | GEMINI_API_KEY/GEMINI_MODEL envs; draft shape compatible with itinerary days/activities | Implemented; best-effort JSON repair; 501 if Gemini key missing. |
+| GET `/api/notifications` | Returns `{ items: NotificationDTO[], meta }` with pagination and optional `isRead` filter. | ISO timestamps, validated payloads per type, data payload persisted | Implemented; mark-read/read-all supported. |
 
 ## Phase D updates
 - Added itinerary endpoints (CRUD, send/confirm) returning ItineraryDTO with ISO dates and numeric costs.

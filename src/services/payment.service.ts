@@ -20,6 +20,12 @@ export const PaymentService = {
     return prisma.$transaction(async (tx) => {
       const booking = await tx.booking.findFirst({
         where: { id: data.bookingId, userId: data.userId },
+        select: {
+          id: true,
+          userId: true,
+          bookingCode: true,
+          destination: true,
+        },
       });
 
       if (!booking) throw new Error("BOOKING_NOT_FOUND");
@@ -49,20 +55,66 @@ export const PaymentService = {
           userId: data.userId,
           type: "PAYMENT",
           title: "Payment submitted",
-          message: `Your payment for booking ${booking.id} has been submitted.`,
-          data: { bookingId: booking.id, paymentId: payment.id },
+          message: `Your payment for booking ${booking.bookingCode ?? booking.id} has been submitted.`,
+          data: {
+            bookingId: booking.id,
+            bookingCode: booking.bookingCode ?? undefined,
+            paymentId: payment.id,
+            status: payment.status,
+            amount: Number(data.amount),
+          },
         },
         tx
       );
+
+      await NotificationService.notifyAdmins({
+        type: "PAYMENT",
+        title: "Payment requires verification",
+        message: `Payment for booking ${booking.bookingCode ?? booking.id} is awaiting review`,
+        data: {
+          bookingId: booking.id,
+          bookingCode: booking.bookingCode ?? undefined,
+          paymentId: payment.id,
+          status: payment.status,
+          amount: Number(data.amount),
+        },
+      });
 
       return payment;
     });
   },
 
   async updatePaymentStatus(paymentId: string, status: "VERIFIED" | "REJECTED") {
-    return prisma.payment.update({
-      where: { id: paymentId },
-      data: { status },
+    return prisma.$transaction(async (tx) => {
+      const payment = await tx.payment.findUnique({
+        where: { id: paymentId },
+        include: { booking: { select: { id: true, userId: true, bookingCode: true } } },
+      });
+
+      if (!payment) throw new Error("PAYMENT_NOT_FOUND");
+
+      const updated = await tx.payment.update({ where: { id: paymentId }, data: { status } });
+
+      await NotificationService.create(
+        {
+          userId: payment.booking.userId,
+          type: "PAYMENT",
+          title: "Payment status updated",
+          message:
+            status === "VERIFIED"
+              ? `Your payment for booking ${payment.booking.bookingCode ?? payment.booking.id} was verified.`
+              : `Your payment for booking ${payment.booking.bookingCode ?? payment.booking.id} was rejected.`,
+          data: {
+            paymentId: payment.id,
+            bookingId: payment.booking.id,
+            bookingCode: payment.booking.bookingCode ?? undefined,
+            status,
+          },
+        },
+        tx
+      );
+
+      return updated;
     });
   },
 

@@ -220,10 +220,29 @@ export const BookingService = {
           type: "BOOKING",
           title: "Booking created",
           message: `Your booking to ${booking.destination} has been created.`,
-          data: { bookingId: booking.id },
+          data: {
+            bookingId: booking.id,
+            bookingCode: booking.bookingCode,
+            status: booking.status,
+            itineraryId: booking.itineraryId,
+            destination: booking.destination ?? undefined,
+          },
         },
         tx
       );
+
+      await NotificationService.notifyAdmins({
+        type: "BOOKING",
+        title: "New booking created",
+        message: `Booking ${booking.bookingCode} requires review`,
+        data: {
+          bookingId: booking.id,
+          bookingCode: booking.bookingCode,
+          status: booking.status,
+          itineraryId: booking.itineraryId,
+          destination: booking.destination ?? undefined,
+        },
+      });
 
       return booking;
     });
@@ -343,7 +362,7 @@ export const BookingService = {
     return prisma.$transaction(async (tx) => {
       const booking = await tx.booking.findUnique({
         where: { id: bookingId },
-        select: { status: true },
+        select: { status: true, userId: true, bookingCode: true, itineraryId: true, destination: true },
       });
 
       if (!booking) {
@@ -394,6 +413,26 @@ export const BookingService = {
           `Status set to ${status} for booking ${bookingId}`
         );
       }
+
+      await NotificationService.create(
+        {
+          userId: booking.userId,
+          type: "BOOKING",
+          title: "Booking status updated",
+          message:
+            status === "REJECTED"
+              ? `Your booking ${booking.bookingCode} was rejected.`
+              : `Your booking ${booking.bookingCode} status is now ${status}.`,
+          data: {
+            bookingId: bookingId,
+            bookingCode: booking.bookingCode ?? undefined,
+            status,
+            itineraryId: booking.itineraryId ?? undefined,
+            destination: booking.destination ?? undefined,
+          },
+        },
+        tx
+      );
 
       return updated;
     });

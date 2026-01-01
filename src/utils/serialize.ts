@@ -1,7 +1,16 @@
 import { Decimal } from "@prisma/client/runtime/library";
-import { Booking, Itinerary, ItineraryCollaborator, ItineraryDay, Activity, User } from "@prisma/client";
+import {
+  Booking,
+  Itinerary,
+  ItineraryCollaborator,
+  ItineraryDay,
+  Activity,
+  User,
+  Notification,
+} from "@prisma/client";
 import { BookingDTO } from "@/dtos/booking.dto";
 import { ItineraryDTO } from "@/dtos/itinerary.dto";
+import { NotificationDTO } from "@/dtos/notification.dto";
 
 export const toISO = (date?: Date | null): string | null => {
   if (!date) return null;
@@ -182,5 +191,22 @@ export const serializeUser = (user?: User | null): UserDTO | null => {
     lastLogin: toISO(user.lastLogin),
     createdAt: toISO(user.createdAt),
     updatedAt: toISO(user.updatedAt),
+  };
+};
+
+export const serializeNotification = (
+  notification?: Notification | null
+): NotificationDTO | null => {
+  if (!notification) return null;
+
+  return {
+    id: notification.id,
+    userId: notification.userId,
+    type: notification.type,
+    title: notification.title,
+    message: notification.message,
+    data: (notification.data as any) ?? null,
+    isRead: notification.isRead,
+    createdAt: toISO(notification.createdAt) as string,
   };
 };

@@ -52,3 +52,18 @@ _To be updated alongside schema changes. Capture applied migrations, backfill st
 - **Backfill guidance:**
   - Optional: populate `yearsInOperation` for existing organizers; leave null if unknown.
   - Ensure any API clients expecting the field handle null values.
+
+## Phase F (Notifications)
+- **Change set:** No new tables; structured notification payload validation added with hooks for booking/payment/inquiry flows.
+- **Apply:**
+  ```bash
+  npx prisma migrate deploy
+  ```
+- **Verification:**
+  ```bash
+  # Ensure table exists (already present):
+  npx prisma db pull
+  npx prisma studio # inspect notifications table for new rows after actions
+  ```
+- **Backfill guidance:**
+  - None required; existing notifications remain valid. New payload validation enforces typed data on inserts.
