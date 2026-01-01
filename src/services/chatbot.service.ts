@@ -20,43 +20,10 @@ function requireGeminiKey() {
   }
   return apiKey;
 }
-import { FaqEntry } from "@prisma/client";
-import { prisma } from "@/config/database";
-import { AppError } from "@/utils/responseHandler";
-import { HTTP_STATUS } from "@/constants/constants";
-
-type GeminiContent = {
-  candidates?: { content?: { parts?: { text?: string }[] } }[];
-};
-
-const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-1.5-flash";
-
-function requireGeminiKey() {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    throw new AppError(
-      HTTP_STATUS.NOT_IMPLEMENTED,
-      "Gemini API key is not configured"
-    );
-  }
-  return apiKey;
-}
 
 async function callGemini(prompt: string) {
   const apiKey = requireGeminiKey();
-async function callGemini(prompt: string) {
-  const apiKey = requireGeminiKey();
 
-  const response = await axios.post<GeminiContent>(
-    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`,
-    {
-      contents: [
-        {
-          parts: [{ text: prompt }],
-        },
-      ],
-    }
-  );
   const response = await axios.post<GeminiContent>(
     `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`,
     {

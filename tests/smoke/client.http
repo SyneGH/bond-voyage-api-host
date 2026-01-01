@@ -9,7 +9,7 @@
 
 @localBaseUrl = http://localhost:8087/api/v1
 @prodBaseUrl = https://bond-voyage-api-host.onrender.com/api/v1
-@baseUrl = {{prodBaseUrl}}
+@baseUrl = {{localBaseUrl}}
 
 @email = user@example.com
 @password = User@123
@@ -36,7 +36,7 @@ GET {{baseUrl}}/health
 ### CORS preflight (adjust Origin to match CORS_ORIGINS)
 # Expected: 204/200
 OPTIONS {{baseUrl}}/health
-Origin: https://localhost:3000
+Origin: http://localhost:3000
 Access-Control-Request-Method: GET
 
 ### ======================================================
@@ -723,3 +723,5 @@ Content-Type: application/json
 # Expected (non-admin): 403 Forbidden
 GET {{baseUrl}}/dashboard/stats
 Authorization: Bearer {{accessToken}}
+
+

@@ -15,12 +15,10 @@ import {
   loginDto,
   registerDto,
   refreshTokenDto,
-  refreshTokenDto,
   resetPasswordDto,
   sendOtpDto,
   verifyOtpDto,
 } from "@/validators/auth.dto";
-import { serializeUser } from "@/utils/serialize";
 import { serializeUser } from "@/utils/serialize";
 
 class AuthController {
@@ -48,7 +46,6 @@ class AuthController {
       });
 
       createResponse(res, HTTP_STATUS.CREATED, "Registration successful", {
-        user: serializeUser(authUser),
         user: serializeUser(authUser),
         accessToken,
       });
@@ -90,7 +87,6 @@ class AuthController {
 
 
       createResponse(res, HTTP_STATUS.OK, "Login successful", {
-        user: serializeUser(authUser),
         user: serializeUser(authUser),
         accessToken,
         refreshToken

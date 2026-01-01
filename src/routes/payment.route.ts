@@ -9,8 +9,14 @@ const router = Router();
 router.get(
   "/",
   authenticate,
-  authorize([Role.ADMIN]),
+  // authorize([Role.ADMIN]),
   asyncHandler(PaymentController.list)
+);
+
+router.post(
+  "/:id",
+  authenticate,
+  asyncHandler(PaymentController.create)
 );
 
 router.get(
