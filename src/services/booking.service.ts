@@ -440,16 +440,13 @@ export const BookingService = {
     const [items, total] = await prisma.$transaction([
       prisma.booking.findMany({
         where: whereClause,
-        select: {
-          id: true,
-          destination: true,
-          startDate: true,
-          endDate: true,
-          totalPrice: true,
-          status: true,
-          type: true,
-          tourType: true,
-          createdAt: true,
+        include: {
+          itinerary: {
+            include: {
+              collaborators: true,
+              days: { include: { activities: true }, orderBy: { dayNumber: "asc" } },
+            },
+          },
         },
         orderBy: { createdAt: "desc" },
         skip,
@@ -488,16 +485,13 @@ export const BookingService = {
     const [items, total] = await prisma.$transaction([
       prisma.booking.findMany({
         where: whereClause,
-        select: {
-          id: true,
-          destination: true,
-          startDate: true,
-          endDate: true,
-          totalPrice: true,
-          status: true,
-          type: true,
-          tourType: true,
-          createdAt: true,
+        include: {
+          itinerary: {
+            include: {
+              collaborators: true,
+              days: { include: { activities: true }, orderBy: { dayNumber: "asc" } },
+            },
+          },
           user: { select: { id: true, firstName: true, lastName: true, email: true } },
         },
         orderBy: { createdAt: "desc" },
@@ -586,6 +580,12 @@ export const BookingService = {
       prisma.booking.findMany({
         where: whereClause,
         include: {
+          itinerary: {
+            include: {
+              collaborators: true,
+              days: { include: { activities: true }, orderBy: { dayNumber: "asc" } },
+            },
+          },
           user: { select: { firstName: true, lastName: true, email: true } },
         },
         orderBy,

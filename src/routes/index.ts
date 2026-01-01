@@ -14,6 +14,9 @@ import placeRoutes from "./place.route";
 import chatbotRoutes from "./chatbot.route";
 import dashboardRoutes from "./dashboard.route";
 import aiRoutes from "./ai.route";
+import itineraryRoutes from "./itinerary.route";
+import faqRoutes from "./faq.route";
+import uploadRoutes from "./upload.route";
 
 const router = Router();
 
@@ -33,6 +36,9 @@ router.use("/places", placeRoutes);
 router.use("/chatbots", chatbotRoutes);
 router.use("/dashboard", dashboardRoutes);
 router.use("/ai", aiRoutes);
+router.use("/itineraries", itineraryRoutes);
+router.use("/faqs", faqRoutes);
+router.use("/upload", uploadRoutes);
 
 // Health check route
 router.get("/health", (req, res) => {

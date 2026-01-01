@@ -13,3 +13,8 @@ Maps each requirement to current repo state, impacted areas, and risks.
 | Notification payload corrections | NotificationService stores generic message/data without structured payloads; key flows (booking status/payment) do not emit typed notifications. | `src/services/notification.service.ts`, booking/payment/inquiry controllers | Define notification schema and ensure lifecycle hooks fire consistently; consider migration for typed data. |
 | Refresh token via request body | Refresh endpoint only reads cookie `refreshToken`; no body fallback supported. | `src/controllers/auth.controller.ts`, auth routes/validators | Ensure backward compatibility with cookie-based clients while accepting body token. |
 | Optional chatbot transport stub | Chatbot controllers return static text without transport/queue abstraction; no stub transport for future messaging layer. | `src/controllers/chatbot.controller.ts`, `src/services/chatbot.service.ts` | Keep stub lightweight to avoid blocking; document that real transport is pending. |
+
+## Phase D closures
+- Separated itinerary endpoints from bookings with collaborator support.
+- Booking DTOs normalized with ISO dates and numeric totals.
+- Added weather/faq/upload stubs to unblock frontend.
