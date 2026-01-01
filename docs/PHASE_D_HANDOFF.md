@@ -1,29 +1,29 @@
 # Phase D Handoff
 
 ## Endpoints
-- POST /api/itineraries
-- GET /api/itineraries/:id
-- GET /api/itineraries
-- PATCH /api/itineraries/:id
-- DELETE /api/itineraries/:id
-- PATCH /api/itineraries/:id/send
-- PATCH /api/itineraries/:id/confirm
-- POST /api/itineraries/:id/collaborators
-- GET /api/itineraries/:id/collaborators
-- DELETE /api/itineraries/:id/collaborators/:userId
-- POST /api/bookings
-- GET /api/bookings/:id
-- GET /api/bookings/my-bookings
-- GET /api/bookings/shared-with-me
-- GET /api/bookings/admin/bookings
-- PATCH /api/bookings/:id/status
-- PATCH /api/bookings/:id/payment
-- GET /api/weather/forecast
-- GET /api/faqs
-- POST /api/upload/itinerary-thumbnail
+- POST /api/v1/itineraries
+- GET /api/v1/itineraries/:id
+- GET /api/v1/itineraries
+- PATCH /api/v1/itineraries/:id
+- DELETE /api/v1/itineraries/:id
+- PATCH /api/v1/itineraries/:id/send
+- PATCH /api/v1/itineraries/:id/confirm
+- POST /api/v1/itineraries/:id/collaborators
+- GET /api/v1/itineraries/:id/collaborators
+- DELETE /api/v1/itineraries/:id/collaborators/:userId
+- POST /api/v1/bookings
+- GET /api/v1/bookings/:id
+- GET /api/v1/bookings/my-bookings
+- GET /api/v1/bookings/shared-with-me
+- GET /api/v1/bookings/admin/bookings
+- PATCH /api/v1/bookings/:id/status
+- PATCH /api/v1/bookings/:id/payment
+- GET /api/v1/weather/forecast
+- GET /api/v1/faqs
+- POST /api/v1/upload/itinerary-thumbnail
 
 ## Samples
-- **POST /api/bookings**
+- **POST /api/v1/bookings**
 ```json
 {
   "itineraryId": "<itinerary-id>",
@@ -40,7 +40,7 @@ Response snippet:
 }
 ```
 
-- **GET /api/itineraries**
+- **GET /api/v1/itineraries**
 ```json
 {
   "data": [
@@ -49,7 +49,7 @@ Response snippet:
 }
 ```
 
-- **GET /api/faqs**
+- **GET /api/v1/faqs**
 ```json
 {
   "data": [
@@ -58,7 +58,7 @@ Response snippet:
 }
 ```
 
-- **GET /api/weather/forecast**
+- **GET /api/v1/weather/forecast**
 ```json
 {
   "data": {
@@ -72,7 +72,7 @@ Response snippet:
 }
 ```
 
-- **POST /api/upload/itinerary-thumbnail**
+- **POST /api/v1/upload/itinerary-thumbnail**
 ```json
 {
   "url": "https://example.com/thumbnail.png"
