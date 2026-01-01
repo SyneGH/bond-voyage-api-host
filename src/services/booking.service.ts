@@ -142,8 +142,10 @@ export const BookingService = {
               userId: data.userId,
               title: data.itinerary?.title ?? "Itinerary",
               destination: data.itinerary?.destination ?? "",
-              startDate: data.itinerary?.startDate ?? undefined,
-              endDate: data.itinerary?.endDate ?? undefined,
+
+              startDate: data.itinerary?.startDate ? new Date(data.itinerary.startDate) : undefined,
+              endDate: data.itinerary?.endDate ? new Date(data.itinerary.endDate) : undefined,
+
               travelers: data.itinerary?.travelers ?? 1,
               type: data.itinerary?.type ?? ItineraryType.CUSTOMIZED,
               tourType: data.itinerary?.tourType ?? data.tourType ?? TourType.PRIVATE,
@@ -151,7 +153,8 @@ export const BookingService = {
                 ? {
                     create: data.itinerary.days.map((day) => ({
                       dayNumber: day.dayNumber,
-                      date: day.date ?? undefined,
+
+                      date: day.date ? new Date(day.date) : undefined,
                       activities: { create: day.activities },
                     })),
                   }

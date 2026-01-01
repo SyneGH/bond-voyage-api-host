@@ -49,8 +49,10 @@ export const ItineraryService = {
         userId: data.userId,
         title: data.title,
         destination: data.destination,
-        startDate: data.startDate ?? undefined,
-        endDate: data.endDate ?? undefined,
+
+        startDate: data.startDate ? new Date(data.startDate) : undefined,
+        endDate: data.endDate ? new Date(data.endDate) : undefined,
+
         travelers: data.travelers ?? 1,
         estimatedCost: data.estimatedCost as unknown as Prisma.Decimal,
         type: data.type ?? ItineraryType.CUSTOMIZED,
@@ -59,7 +61,8 @@ export const ItineraryService = {
           ? {
               create: data.days.map((day) => ({
                 dayNumber: day.dayNumber,
-                date: day.date ?? undefined,
+
+                date: day.date ? new Date(day.date) : undefined,
                 activities: { create: day.activities },
               })),
             }

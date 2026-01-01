@@ -8,6 +8,8 @@ export const errorMiddleware = (
   res: Response,
   _next: NextFunction
 ): void => {
+  console.error("🔥 FULL ERROR STACK:", error);
+
   const normalizedError =
     error instanceof AppError
       ? error

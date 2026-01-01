@@ -67,11 +67,14 @@ export const ChatbotService = {
       take: 5,
     });
 
+    // Replace the filter logic in the roameo method:
     const sources: FaqEntry[] = faqs.filter((faq: FaqEntry) => {
-      const q = question.toLowerCase();
-      return (
-        faq.question.toLowerCase().includes(q) || faq.answer.toLowerCase().includes(q)
-      );
+      const queryWords = question.toLowerCase().replace(/[?]/g, '').split(' ').filter(w => w.length > 2);
+      const faqText = (faq.question + " " + faq.answer).toLowerCase();
+      
+      // Check if at least TWO significant words from the query exist in the FAQ
+      const matches = queryWords.filter(word => faqText.includes(word));
+      return matches.length >= 2; 
     });
 
     if (sources.length === 0) {
@@ -89,10 +92,22 @@ export const ChatbotService = {
       )
       .join("\n\n");
 
-    const prompt = `You are Roameo, a strict FAQ bot. 
-    Answer the user's question using ONLY the context provided below. 
-    If the answer is not explicitly in the context, do not make it up.
-    Context:\n${context}\n\nUser question: ${question}\nRespond concisely.`;
+      const prompt = `You are Roameo, the friendly and professional travel assistant for Bond Voyage. 
+      Your goal is to provide helpful, conversational support using ONLY the context provided below.
+
+      Guidelines:
+      1. Use a warm, welcoming tone (e.g., "Certainly!", "I'd be happy to help with that.").
+      2. Refer to the company as "we" or "us" (e.g., "We can help you with...").
+      3. If the answer is found in the context, rephrase it naturally so it doesn't look like a copy-paste.
+      4. If the answer is NOT in the context, politely apologize and suggest they reach out to our human support team.
+      5. Keep the response helpful but professional.
+
+      Context:
+      ${context}
+
+      User question: ${question}
+
+      Response:`;
 
     const text = await callGemini(prompt);
 
@@ -111,11 +126,20 @@ export const ChatbotService = {
   },
 
   async roaman(prompt: string, preferences?: any) {
+    // Define your company's official destinations here
+    const officialDestinations = ["Cebu", "Palawan", "Bohol", "Siargao", "Bicol", "Baguio", "Ilocos", "Baguio"];
+
     const contextLines: string[] = [
-      "You are Roaman, a travel assistant. Provide a friendly message and a valid JSON draft for a SMART_TRIP itinerary.",
-      "Return JSON with keys: message (string) and draft (object).",
-      "Draft must include type='SMART_TRIP', destination, travelers, and days[].",
-      "If unsure about dates, set them to null and keep dayNumber ordering starting at 1.",
+      "You are Roaman, the professional and enthusiastic travel assistant for BondVoyage.",
+      `SCOPE: You ONLY provide travel advice and itineraries for: [${officialDestinations.join(", ")}], and any point in the Philippines.`,
+      "If a user asks about a destination outside this list, politely explain that we currently only service these specific areas.",
+      "TONE: Be warm, professional, and slightly excited. Don't just say 'I generated this.'",
+      "PERSONALIZATION: Use phrases like 'I've curated a special route just for you!', 'This looks like an incredible journey!', or 'I've handpicked some of my favorite spots in the area.'",
+      "STRUCTURE: Return a friendly 'message' and a valid JSON 'draft' for a SMART_TRIP itinerary.",
+      "CONTENT: For every day in the itinerary, you MUST provide at least 3 detailed activities with 'time', 'title', and 'location'.",
+      "Return JSON with keys: 'message' (string) and 'draft' (object).",
+      "Draft must include: type='SMART_TRIP', destination, travelers, and days[].",
+      "If unsure about dates, set them to null and keep dayNumber ordering starting at 1."
     ];
 
     if (preferences) {
@@ -130,21 +154,23 @@ export const ChatbotService = {
     
     const text = await callGemini(fullPrompt);
 
+    // Updated fallback with a more complete "template" if AI fails
     const fallbackDraft = {
-      message: "Here is a SMART_TRIP draft based on your request.",
+      message: "I've put together a starter draft for your Bond Voyage adventure!",
       draft: {
         type: "SMART_TRIP",
-        destination: preferences?.destination || "",
+        destination: preferences?.destination || "Your Destination",
         startDate: preferences?.startDate || null,
         endDate: preferences?.endDate || null,
         travelers: preferences?.travelers || 1,
-        tourType: preferences?.tourType,
         days: [
           {
             dayNumber: 1,
-            date: preferences?.startDate || null,
+            date: null,
             activities: [
-              { time: "09:00", title: "Arrival & check-in", order: 1 },
+              { time: "09:00", title: "Arrival & Welcome", location: "Airport/Terminal", order: 1 },
+              { time: "12:00", title: "Local Lunch", location: "City Center", order: 2 },
+              { time: "15:00", title: "Check-in & Relaxation", location: "Hotel", order: 3 }
             ],
           },
         ],
