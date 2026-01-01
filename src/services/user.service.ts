@@ -3,7 +3,7 @@ import { User, Prisma } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { BCRYPT_SALT_ROUNDS } from "@/constants/constants";
 import { RegisterDto, UserUpdateDto } from "@/types";
-import { logActivity } from "./activity-log.service";
+import { logAudit } from "./activity-log.service";
 
 export class UserService {
   async findByEmail(email: string): Promise<User | null> {
@@ -85,12 +85,14 @@ export class UserService {
     data: RegisterDto
   ): Promise<User> {
     const user = await this.create(data);
-    await logActivity(
-      prisma,
-      actorId,
-      "Created User",
-      `Created user ${user.email}`
-    );
+    await logAudit(prisma, {
+      actorUserId: actorId,
+      action: "USER_CREATED",
+      entityType: "USER",
+      entityId: user.id,
+      metadata: { email: user.email },
+      message: `Created user ${user.email}`,
+    });
     return user;
   }
 
@@ -121,12 +123,13 @@ export class UserService {
   ): Promise<User | null> {
     const user = await this.updateById(id, data);
     if (user) {
-      await logActivity(
-        prisma,
-        actorId,
-        "Updated User",
-        `Updated user ${id}`
-      );
+      await logAudit(prisma, {
+        actorUserId: actorId,
+        action: "USER_UPDATED",
+        entityType: "USER",
+        entityId: id,
+        message: `Updated user ${id}`,
+      });
     }
     return user;
   }
@@ -144,12 +147,13 @@ export class UserService {
   ): Promise<User | null> {
     const user = await this.updateProfile(userId, data);
     if (user) {
-      await logActivity(
-        prisma,
-        userId,
-        "Updated Profile",
-        `Updated profile for user ${userId}`
-      );
+      await logAudit(prisma, {
+        actorUserId: userId,
+        action: "USER_PROFILE_UPDATED",
+        entityType: "USER",
+        entityId: userId,
+        message: `Updated profile for user ${userId}`,
+      });
     }
     return user;
   }
@@ -216,12 +220,13 @@ export class UserService {
 
   async deactivateWithLog(actorId: string, id: string): Promise<User> {
     const user = await this.deactivate(id);
-    await logActivity(
-      prisma,
-      actorId,
-      "Deactivated User",
-      `Deactivated user ${id}`
-    );
+    await logAudit(prisma, {
+      actorUserId: actorId,
+      action: "USER_DEACTIVATED",
+      entityType: "USER",
+      entityId: id,
+      message: `Deactivated user ${id}`,
+    });
     return user;
   }
 
@@ -233,12 +238,13 @@ export class UserService {
 
   async deleteWithLog(actorId: string, id: string): Promise<User> {
     const user = await this.delete(id);
-    await logActivity(
-      prisma,
-      actorId,
-      "Deleted User",
-      `Deleted user ${id}`
-    );
+    await logAudit(prisma, {
+      actorUserId: actorId,
+      action: "USER_DELETED",
+      entityType: "USER",
+      entityId: id,
+      message: `Deleted user ${id}`,
+    });
     return user;
   }
 

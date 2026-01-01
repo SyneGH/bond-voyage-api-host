@@ -13,4 +13,11 @@ router.get(
   asyncHandler(ActivityLogController.list)
 );
 
+router.get(
+  "/:id",
+  authenticate,
+  authorize([Role.ADMIN]),
+  asyncHandler(ActivityLogController.getById)
+);
+
 export default router;

@@ -7,7 +7,7 @@ import {
 } from "@prisma/client";
 import { Role } from "@/constants/constants";
 import { prisma } from "@/config/database";
-import { logActivity } from "@/services/activity-log.service";
+import { logAudit } from "@/services/activity-log.service";
 import { NotificationService } from "@/services/notification.service";
 
 const BOOKING_CODE_PREFIX = "BV";
@@ -208,12 +208,18 @@ export const BookingService = {
         },
       });
 
-      await logActivity(
-        tx,
-        data.userId,
-        "Created Booking",
-        `Created booking ${booking.id} for ${booking.destination}`
-      );
+      await logAudit(tx, {
+        actorUserId: data.userId,
+        action: "BOOKING_CREATED",
+        entityType: "BOOKING",
+        entityId: booking.id,
+        metadata: {
+          bookingCode: booking.bookingCode,
+          destination: booking.destination,
+          status: booking.status,
+        },
+        message: `Created booking ${booking.id} for ${booking.destination}`,
+      });
       await NotificationService.create(
         {
           userId: data.userId,
@@ -306,20 +312,23 @@ export const BookingService = {
         throw new Error("BOOKING_COLLABORATOR_NOT_ALLOWED");
       }
 
-      if (isOwner && !["DRAFT", "PENDING", "REJECTED"].includes(booking.status)) {
-        throw new Error("BOOKING_NOT_EDITABLE");
-      }
+        if (isOwner && !["DRAFT", "PENDING", "REJECTED"].includes(booking.status)) {
+          throw new Error("BOOKING_NOT_EDITABLE");
+        }
 
-      await tx.itineraryDay.deleteMany({ where: { itineraryId: booking.itineraryId } });
+        const destination = data.destination ?? booking.destination ?? undefined;
+        const travelers = data.travelers ?? booking.travelers ?? undefined;
 
-      await tx.itinerary.update({
-        where: { id: booking.itineraryId },
-        data: {
-          destination: data.destination,
-          startDate: data.startDate,
-          endDate: data.endDate,
-          travelers: data.travelers,
-          days: {
+        await tx.itineraryDay.deleteMany({ where: { itineraryId: booking.itineraryId } });
+
+        await tx.itinerary.update({
+          where: { id: booking.itineraryId },
+          data: {
+            destination: data.destination,
+            startDate: data.startDate,
+            endDate: data.endDate,
+            travelers: data.travelers,
+            days: {
             create: data.itinerary.map((day) => ({
               dayNumber: day.dayNumber,
               date: day.date,
@@ -341,12 +350,17 @@ export const BookingService = {
         },
       });
 
-      await logActivity(
-        tx,
-        userId,
-        "Updated Booking",
-        `Updated itinerary for booking ${bookingId}`
-      );
+      await logAudit(tx, {
+        actorUserId: userId,
+        action: "BOOKING_UPDATED",
+        entityType: "BOOKING",
+        entityId: bookingId,
+        metadata: {
+          destination,
+          travelers,
+        },
+        message: `Updated itinerary for booking ${bookingId}`,
+      });
 
       return updated;
     });
@@ -400,18 +414,20 @@ export const BookingService = {
       if (actorId) {
         const action =
           status === "CONFIRMED"
-            ? "Approved Booking"
+            ? "BOOKING_APPROVED"
             : status === "REJECTED"
-              ? "Rejected Booking"
+              ? "BOOKING_REJECTED"
               : status === "COMPLETED"
-                ? "Completed Booking"
-                : "Updated Booking Status";
-        await logActivity(
-          tx,
-          actorId,
+                ? "BOOKING_COMPLETED"
+                : "BOOKING_STATUS_UPDATED";
+        await logAudit(tx, {
+          actorUserId: actorId,
           action,
-          `Status set to ${status} for booking ${bookingId}`
-        );
+          entityType: "BOOKING",
+          entityId: bookingId,
+          metadata: { status },
+          message: `Status set to ${status} for booking ${bookingId}`,
+        });
       }
 
       await NotificationService.create(
@@ -676,12 +692,14 @@ export const BookingService = {
         },
       });
 
-      await logActivity(
-        tx,
-        userId,
-        "Submitted Booking",
-        `Submitted booking ${bookingId} for approval`
-      );
+      await logAudit(tx, {
+        actorUserId: userId,
+        action: "BOOKING_SUBMITTED",
+        entityType: "BOOKING",
+        entityId: bookingId,
+        metadata: { status: updated.status },
+        message: `Submitted booking ${bookingId} for approval`,
+      });
       await NotificationService.create(
         {
           userId,
@@ -716,12 +734,14 @@ export const BookingService = {
         data: { status: "CANCELLED", isResolved: true },
       });
 
-      await logActivity(
-        tx,
-        userId,
-        "Cancelled Booking",
-        `Cancelled booking ${bookingId}`
-      );
+      await logAudit(tx, {
+        actorUserId: userId,
+        action: "BOOKING_CANCELLED",
+        entityType: "BOOKING",
+        entityId: bookingId,
+        metadata: { status: updated.status },
+        message: `Cancelled booking ${bookingId}`,
+      });
 
       return updated;
     });
@@ -764,12 +784,14 @@ export const BookingService = {
         },
       });
 
-      await logActivity(
-        tx,
-        ownerId,
-        "Added Collaborator",
-        `Added collaborator ${collaboratorId} to booking ${bookingId}`
-      );
+      await logAudit(tx, {
+        actorUserId: ownerId,
+        action: "BOOKING_COLLABORATOR_ADDED",
+        entityType: "BOOKING",
+        entityId: bookingId,
+        metadata: { collaboratorId },
+        message: `Added collaborator ${collaboratorId} to booking ${bookingId}`,
+      });
 
       return collaborator;
     });
@@ -827,12 +849,14 @@ export const BookingService = {
         },
       });
 
-      await logActivity(
-        tx,
-        ownerId,
-        "Removed Collaborator",
-        `Removed collaborator ${collaboratorUserId} from booking ${bookingId}`
-      );
+      await logAudit(tx, {
+        actorUserId: ownerId,
+        action: "BOOKING_COLLABORATOR_REMOVED",
+        entityType: "BOOKING",
+        entityId: bookingId,
+        metadata: { collaboratorId: collaboratorUserId },
+        message: `Removed collaborator ${collaboratorUserId} from booking ${bookingId}`,
+      });
 
       return removed;
     });

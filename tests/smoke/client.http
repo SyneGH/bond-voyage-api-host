@@ -724,4 +724,19 @@ Content-Type: application/json
 GET {{baseUrl}}/dashboard/stats
 Authorization: Bearer {{accessToken}}
 
+<<<<<<< HEAD
 
+=======
+### ======================================================
+### 17. AUDIT LOGS (ADMIN)
+### ======================================================
+### List audit logs
+# Expected: 200 OK
+GET {{baseUrl}}/admin/audit-logs?page=1&limit=5&action=BOOKING
+Authorization: Bearer {{accessToken}}
+
+### Get audit log by id (replace :id from list response)
+# Expected: 200 OK
+GET {{baseUrl}}/admin/audit-logs/{{logId}}
+Authorization: Bearer {{accessToken}}
+>>>>>>> 6114cfe43c3194e6ba6950be00d80e5d1e461b7b
