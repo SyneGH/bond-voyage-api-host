@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
-import { createResponse } from "@/utils/responseHandler";
+import { createResponse, throwError } from "@/utils/responseHandler";
 import { HTTP_STATUS } from "@/constants/constants";
+import { prisma } from "@/config/database";
 
 const defaultFaqs = [
   {
@@ -19,6 +20,17 @@ const defaultFaqs = [
 
 export const FaqController = {
   list: async (_req: Request, res: Response): Promise<void> => {
-    createResponse(res, HTTP_STATUS.OK, "FAQs retrieved", defaultFaqs);
+    try {
+      const faqs = await prisma.faqEntry.findMany({
+        where: { isActive: true },
+        orderBy: [{ order: "asc" }, { createdAt: "desc" }],
+      });
+
+      const payload = faqs.length > 0 ? faqs : defaultFaqs;
+
+      createResponse(res, HTTP_STATUS.OK, "FAQs retrieved", payload);
+    } catch (error) {
+      throwError(HTTP_STATUS.INTERNAL_SERVER_ERROR, "Failed to fetch FAQs", error);
+    }
   },
 };

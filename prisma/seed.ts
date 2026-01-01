@@ -248,6 +248,28 @@ async function main() {
     }
   });
 
+  // --- FAQ ENTRIES (RAG SOURCE) ---
+  await Promise.all(
+    FAQ_ENTRIES.map((faq) =>
+      prisma.faqEntry.upsert({
+        where: { id: faq.id },
+        update: {
+          question: faq.question,
+          answer: faq.answer,
+          order: faq.order,
+          isActive: true,
+        },
+        create: {
+          id: faq.id,
+          question: faq.question,
+          answer: faq.answer,
+          order: faq.order,
+          isActive: true,
+        },
+      })
+    )
+  );
+
   console.log("🎉 Seeding completed!");
 }
 

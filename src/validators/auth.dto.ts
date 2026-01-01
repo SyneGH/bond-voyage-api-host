@@ -47,3 +47,7 @@ export const verifyOtpDto = z.object({
   email: z.string().email(),
   otp: z.string().length(6),
 });
+
+export const refreshTokenDto = z
+  .object({ refreshToken: z.string().min(1) })
+  .partial();
