@@ -48,6 +48,7 @@ export interface UserUpdateDto {
   middleName?: string;
   lastName?: string;
   email?: string;
+  yearsInOperation?: number | null;
 }
 
 export interface ChangePasswordDto {

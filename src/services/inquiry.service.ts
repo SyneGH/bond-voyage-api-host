@@ -35,10 +35,25 @@ export const InquiryService = {
           type: "INQUIRY",
           title: "Inquiry created",
           message: `Your inquiry "${subject}" has been received.`,
-          data: { inquiryId: inquiry.id, bookingId: inquiry.bookingId },
+          data: {
+            inquiryId: inquiry.id,
+            bookingId: inquiry.bookingId ?? undefined,
+            subject,
+          },
         },
         tx
       );
+
+      await NotificationService.notifyAdmins({
+        type: "INQUIRY",
+        title: "New inquiry submitted",
+        message: `Inquiry "${subject}" requires attention`,
+        data: {
+          inquiryId: inquiry.id,
+          bookingId: inquiry.bookingId ?? undefined,
+          subject,
+        },
+      });
 
       return inquiry;
     });

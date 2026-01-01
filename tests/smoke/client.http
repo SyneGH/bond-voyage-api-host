@@ -130,7 +130,7 @@ Content-Type: application/json
 
 ### Refresh token (requires refreshToken cookie from login)
 # Expected: 200 OK
-POST {{baseUrl}}/auth/refresh-token
+POST {{baseUrl}}/auth/refresh
 
 ### Profile
 # Expected: 200 OK

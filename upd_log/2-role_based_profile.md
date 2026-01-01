@@ -197,7 +197,7 @@
 
 ### 3. **Refresh Access Token**
 
-**Endpoint:** `POST /auth/refresh-token`
+**Endpoint:** `POST /auth/refresh`
 
 **Request:** No body required (uses httpOnly cookie)
 
