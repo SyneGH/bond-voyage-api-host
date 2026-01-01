@@ -16,6 +16,10 @@ import {
 } from "@/validators/user.dto";
 import { requireAuthUser } from "@/utils/requestGuards";
 import { prisma } from "@/config/database";
+import { dashboardStatsQueryDto } from "@/validators/dashboard.dto";
+import { DashboardService } from "@/services/dashboard.service";
+import { activityLogListQueryDto } from "@/validators/activity-log.dto";
+import { ActivityLogService } from "@/services/activity-log.service";
 
 class UserController {
   // Cache TTL constants (in seconds)
@@ -411,6 +415,73 @@ class UserController {
         throw error;
       }
       throwError(HTTP_STATUS.BAD_REQUEST, "Failed to update profile", error);
+    }
+  };
+
+  public getMyStats = async (
+    req: AuthenticatedRequest,
+    res: Response
+  ): Promise<void> => {
+    try {
+      const { year } = dashboardStatsQueryDto.parse(req.query);
+      const authUser = requireAuthUser(req);
+
+      const result = await DashboardService.getSelfStats(year, authUser.userId);
+
+      createResponse(res, HTTP_STATUS.OK, "User stats retrieved", result);
+    } catch (error) {
+      if (error instanceof ZodError) {
+        throwError(HTTP_STATUS.BAD_REQUEST, "Validation failed", error.errors);
+      }
+      if (error instanceof AppError) {
+        throw error;
+      }
+      throwError(
+        HTTP_STATUS.INTERNAL_SERVER_ERROR,
+        "Failed to fetch user stats",
+        error
+      );
+    }
+  };
+
+  public getMyActivityLogs = async (
+    req: AuthenticatedRequest,
+    res: Response
+  ): Promise<void> => {
+    try {
+      const { page, limit, type, dateFrom, dateTo } =
+        activityLogListQueryDto.omit({ actorId: true }).parse(req.query);
+
+      const authUser = requireAuthUser(req);
+
+      const result = await ActivityLogService.list({
+        page,
+        limit,
+        actorId: authUser.userId,
+        type,
+        dateFrom,
+        dateTo,
+      });
+
+      createResponse(
+        res,
+        HTTP_STATUS.OK,
+        "Activity logs retrieved",
+        result.items,
+        result.meta
+      );
+    } catch (error) {
+      if (error instanceof ZodError) {
+        throwError(HTTP_STATUS.BAD_REQUEST, "Validation failed", error.errors);
+      }
+      if (error instanceof AppError) {
+        throw error;
+      }
+      throwError(
+        HTTP_STATUS.INTERNAL_SERVER_ERROR,
+        "Failed to fetch activity logs",
+        error
+      );
     }
   };
 

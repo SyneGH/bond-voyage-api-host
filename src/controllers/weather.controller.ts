@@ -68,11 +68,17 @@ export const WeatherController = {
         }
       );
 
+      const forecast = (response.data?.list ?? []).slice(0, 5).map((item: any) => ({
+        date: new Date(item.dt * 1000).toISOString(),
+        temperatureC: typeof item.main?.temp === "number" ? item.main.temp : null,
+        description: item.weather?.[0]?.description ?? "",
+      }));
+
       createResponse(
         res,
         HTTP_STATUS.OK,
         "Weather forecast retrieved",
-        response.data
+        { lat, lng, unit: "metric", forecast }
       );
     } catch (error) {
       if (error instanceof ZodError) {
