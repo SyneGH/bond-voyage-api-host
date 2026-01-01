@@ -8,7 +8,7 @@ const router = Router();
 // Public routes
 router.post("/register", asyncHandler(authController.register));
 router.post("/login", asyncHandler(authController.login));
-router.post("/refresh-token", asyncHandler(authController.refreshToken));
+router.post("/refresh", asyncHandler(authController.refreshToken));
 router.post("/reset-password", asyncHandler(authController.resetPassword));
 router.post("/send-otp", asyncHandler(authController.sendOTP));
 router.post("/verify-otp", asyncHandler(authController.verifyOTP));

@@ -1,32 +1,35 @@
 # Execution Plan
 
 ## Stack Scan (Phase 0)
-- Framework: Express (TypeScript) with custom routing/controllers.
-- ORM/DB: Prisma ORM targeting PostgreSQL; migrations via `prisma migrate` with SQL in `prisma/migrations/`.
-- Booking logic: primarily in `src/services/booking.service.ts`, controllers in `src/controllers/booking.controller.ts`, validators in `src/validators/booking.dto.ts`, routes in `src/routes/booking.route.ts`.
-- Migration strategy: Prisma migrations; seeding via `prisma/seed.ts`, generation via `npm run db:migrate`.
+- **Framework:** Express (TypeScript) with route/controller structure under `src/`.
+- **ORM/DB:** Prisma ORM targeting PostgreSQL; migrations stored in `prisma/migrations/` and run via `npm run db:migrate`.
+- **Booking Logic:** Service-layer logic in `src/services/booking.service.ts`; HTTP handlers in `src/controllers/booking.controller.ts`; DTO/validation in `src/validators/booking.dto.ts`; routes wired in `src/routes/booking.route.ts`.
+- **Migration Strategy:** Prisma migrations with optional seeding via `prisma/seed.ts`; generated client via `npm run db:generate`.
 
-## Phases Overview
-- **Phase A — Repo Audit & Issue + Contract Matrices**: Map requirements to code areas; identify endpoint gaps. Touch docs/ISSUE_MATRIX.md, docs/CONTRACT_MATRIX.md.
-- **Phase B — DB Refactor (Itinerary + Booking Tables)**: Update Prisma schema/migrations for itinerary separation. Areas: `prisma/schema.prisma`, new migration, docs/MIGRATION_NOTES.md.
-- **Phase C — Booking Code Generator BV-YEAR-NUMBER**: Transaction-safe generator in booking layer. Areas: `src/services/booking.service.ts` or utility, tests/scripts.
-- **Phase D1 — DTOs + Shared Date Serializer**: Define DTO contracts and ISO date helper. Areas: `src/dtos/*`, `src/utils/date.ts`.
-- **Phase D2 — Itinerary Endpoints**: CRUD + collaborator/request flow. Areas: `src/controllers/itinerary.controller.ts`, `src/routes/itinerary.route.ts`, services/validators.
-- **Phase D3 — Booking Endpoints Core**: POST/GET bookings aligned with itinerary types. Areas: `src/controllers/booking.controller.ts`, service and validators.
-- **Phase D4 — Booking Admin + Payment + Lifecycle**: Approve/reject/payment/cancel/complete. Areas: booking/payment controllers/services.
-- **Phase D5 — Weather Forecast Endpoint**: Implement/stub forecast. Areas: new controller/route, service or integration.
-- **Phase D6 — FAQ Endpoint**: GET /faqs. Areas: controller/route/service, possibly prisma model.
-- **Phase D7 — Upload Endpoint (thumbnail)**: File upload handling. Areas: middleware/storage, itinerary controller/route.
-- **Phase E — Permissions Fix**: Self-scope stats/activity logs. Areas: `src/controllers/user.controller.ts`, authz middleware.
-- **Phase F — Notifications**: Structured notifications and dynamic messages. Areas: `src/services/notification.service.ts` and relevant controllers/services.
-- **Phase G — Refresh Token Body Support**: Allow body token. Areas: `src/controllers/auth.controller.ts` or middleware.
-- **Phase H — Years In Operation + Date Normalization**: Add numeric `yearsInOperation`; enforce ISO date handling. Areas: Prisma schema, related services/serializers.
-- **Phase I — Response Completeness Audit**: Capture payload samples. Areas: docs/RESPONSE_AUDIT.md.
-- **Phase J — Final Integration Handoff**: Populate docs/API_HANDOFF.md with flow/payload guidance.
+## Phased Roadmap (A–J)
+Each phase lists the primary repo areas and a short implementation guide to keep scope tight.
+
+| Phase | Focus | Repo Areas | Implementation Guide |
+| --- | --- | --- | --- |
+| A | Repo audit; draft Issue & Contract matrices | `docs/ISSUE_MATRIX.md`, `docs/CONTRACT_MATRIX.md` | Read controllers/services for current behavior; map requirements to files and note gaps in tables. |
+| B | DB refactor (Itinerary + Booking tables) | `prisma/schema.prisma`, `prisma/migrations/*`, `docs/MIGRATION_NOTES.md` | Add/adjust models and enums; generate migration; document deployment notes. |
+| C | BV-YEAR-NUMBER booking code generator | `src/services/booking.service.ts`, possible `src/utils/*`, tests/scripts | Implement transaction-safe generator using Prisma, ensure format and uniqueness. |
+| D1 | DTO contracts + date serializer | `src/dtos/*`, `src/utils/date.ts` | Define canonical response DTOs and shared ISO serialization helper. |
+| D2 | Itinerary endpoints (CRUD + requested flow stubs) | `src/controllers/itinerary.controller.ts`, `src/routes/itinerary.route.ts`, services/validators | Implement CRUD + collaborator/request send/confirm (stub if needed) returning DTOs. |
+| D3 | Booking endpoints core | `src/controllers/booking.controller.ts`, `src/routes/booking.route.ts`, validators/services | POST booking + GET my bookings/by id using new DTOs and booking codes. |
+| D4 | Booking admin + payment lifecycle | Booking/payment controllers & services, validators | Admin approve/reject, payment receipt/verify, cancel/complete flows with notifications hooks. |
+| D5 | Weather forecast endpoint | `src/controllers/weather.controller.ts`, `src/routes/weather.route.ts`, services | Standardize forecast array; stub allowed if external API unavailable. |
+| D6 | FAQ endpoint | New controller/route/service; possible Prisma model | Add GET /faqs (stub or backed by DB), return ordered list. |
+| D7 | Upload endpoint (itinerary thumbnail) | Upload middleware, `src/controllers/itinerary.controller.ts`, `src/routes/*` | Accept thumbnail upload (or stub URL) and attach to itinerary DTO. |
+| E | Permissions fixes (self-scope + admin) | `src/routes/user.route.ts`, `src/controllers/user.controller.ts`, `src/routes/activity-log.route.ts` | Add `/users/me` stats/activity endpoints with proper authz while keeping admin visibility. |
+| F | Structured notifications | `src/services/notification.service.ts`, booking/payment/inquiry controllers | Enforce typed payloads and emit notifications in key flows. |
+| G | Refresh token via request body | `src/controllers/auth.controller.ts`, auth routes/validators | Accept token from body (and cookie fallback) for `/auth/refresh`. |
+| H | Years in operation + datetime normalization | `prisma/schema.prisma`, DTO serializers, relevant controllers | Add numeric `yearsInOperation`; ensure ISO date/time across responses. |
+| I | Response completeness audit | `docs/RESPONSE_AUDIT.md` | Capture sample JSON per endpoint proving required fields. |
+| J | Final integration handoff | `docs/API_HANDOFF.md` | Summarize payloads, stubs, flows for frontend integration. |
 
 ## Risks & Notes
-- Prisma migrations must stay consistent; coordinate schema refactors carefully.
-- Booking logic tightly couples itinerary fields; refactor may require data migration scripts.
-- Date normalization and serializer changes risk breaking existing consumers; ensure backward-compatible ISO formats.
-- Adding upload/forecast may need stubs if infra unavailable; document TODOs.
-- Permissions changes must consider admin vs self scopes; verify middleware paths.
+- Prisma migrations must stay in sync with code changes; coordinate schema refactors with data backfills.
+- Booking/itinerary separation may require data migration to avoid breaking references.
+- ISO serialization changes can affect existing consumers; keep backward compatibility where possible.
+- External-dependent endpoints (weather/upload) may need stubs—document them clearly for follow-up.

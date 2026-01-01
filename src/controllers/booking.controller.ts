@@ -20,6 +20,7 @@ import { addCollaboratorDto } from "@/validators/collaboration.dto";
 import userService from "@/services/user.service";
 import { requireAuthUser } from "@/utils/requestGuards";
 import { bookingPaymentListQueryDto } from "@/validators/payment.dto";
+import { serializeBooking } from "@/utils/serialize";
 
 export const BookingController = {
   // POST /api/bookings
@@ -32,12 +33,20 @@ export const BookingController = {
       const booking = await BookingService.createBooking({
         ...payload,
         userId: authUser.userId,
+        role: authUser.role,
       });
+      const dto = serializeBooking(booking, authUser.userId);
 
-      createResponse(res, HTTP_STATUS.CREATED, "Booking created", booking);
+      createResponse(res, HTTP_STATUS.CREATED, "Booking created", dto);
     } catch (error) {
       if (error instanceof ZodError) {
         throwError(HTTP_STATUS.BAD_REQUEST, "Validation failed", error.errors);
+      }
+      if (error instanceof Error && error.message === "ITINERARY_NOT_FOUND") {
+        throwError(HTTP_STATUS.NOT_FOUND, "Itinerary not found");
+      }
+      if (error instanceof Error && error.message === "ITINERARY_FORBIDDEN") {
+        throwError(HTTP_STATUS.FORBIDDEN, "Forbidden");
       }
       if (error instanceof AppError) {
         throw error;
@@ -69,8 +78,8 @@ export const BookingController = {
       const bookingRecord = booking as NonNullable<typeof booking>;
 
       if (authUser.role !== "ADMIN" && bookingRecord.userId !== authUser.userId) {
-        const isCollaborator = bookingRecord.collaborators?.some(
-          (collab) => collab.userId === authUser.userId
+        const isCollaborator = bookingRecord.itinerary?.collaborators?.some(
+          (collab: { userId: string }) => collab.userId === authUser.userId
         );
 
         if (!isCollaborator) {
@@ -78,7 +87,8 @@ export const BookingController = {
         }
       }
 
-      createResponse(res, HTTP_STATUS.OK, "Booking retrieved", bookingRecord);
+      const dto = serializeBooking(bookingRecord, authUser.userId);
+      createResponse(res, HTTP_STATUS.OK, "Booking retrieved", dto);
     } catch (error) {
       if (error instanceof ZodError) {
         throwError(HTTP_STATUS.BAD_REQUEST, "Validation failed", error.errors);
@@ -185,14 +195,9 @@ export const BookingController = {
         limit,
         status as BookingStatus | undefined
       );
+      const items = result.items.map((item) => serializeBooking(item, authUser.userId));
 
-      createResponse(
-        res,
-        HTTP_STATUS.OK,
-        "Bookings retrieved",
-        result.items,
-        result.meta
-      );
+      createResponse(res, HTTP_STATUS.OK, "Bookings retrieved", items, result.meta);
     } catch (error) {
       if (error instanceof ZodError) {
         throwError(HTTP_STATUS.BAD_REQUEST, "Validation failed", error.errors);
@@ -225,11 +230,13 @@ export const BookingController = {
         status as BookingStatus | undefined
       );
 
+      const items = result.items.map((item) => serializeBooking(item, authUser.userId));
+
       createResponse(
         res,
         HTTP_STATUS.OK,
         "Shared bookings retrieved",
-        result.items,
+        items,
         result.meta
       );
     } catch (error) {
@@ -275,28 +282,7 @@ export const BookingController = {
         page,
         limit
       );
-      const formattedItems = result.items.map((b: any) => ({
-        id: b.id,
-        // Flatten User Data
-        customer: `${b.user.firstName} ${b.user.lastName}`,
-        email: b.user.email,
-        mobile: b.user.mobile || "N/A", // Ensure this exists in service selection if needed
-        
-        // Flatten Trip Data
-        destination: b.destination,
-        dates: `${new Date(b.startDate).toISOString().split('T')[0]} - ${new Date(b.endDate).toISOString().split('T')[0]}`,
-        travelers: b.travelers,
-        total: b.totalPrice.toString(),
-        bookedDate: b.createdAt,
-        
-        // Missing Frontend Fields
-        rejectionReason: b.rejectionReason,
-        rejectionResolution: b.rejectionResolution,
-        resolutionStatus: b.isResolved ? 'resolved' : 'unresolved',
-        statusBadges: b.status, 
-        bookingType: b.type,
-        tourType: b.tourType,
-      }));
+      const formattedItems = result.items.map((b: any) => serializeBooking(b));
       createResponse(
         res,
         HTTP_STATUS.OK,

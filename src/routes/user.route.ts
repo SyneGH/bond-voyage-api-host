@@ -12,6 +12,8 @@ router.use(authenticate);
 // User profile routes
 router.put("/profile", asyncHandler(userController.updateProfile));
 router.put("/change-password", asyncHandler(userController.changePassword));
+router.get("/me/stats", asyncHandler(userController.getMyStats));
+router.get("/me/activity-logs", asyncHandler(userController.getMyActivityLogs));
 
 // Admin only routes
 router.post("/", authorize([Role.ADMIN]), asyncHandler(userController.addUser));

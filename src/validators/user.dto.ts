@@ -35,6 +35,12 @@ export const updateProfileDto = z.object({
     .email()
     .regex(Regex.EMAIL_PATTERN)
     .optional(),
+  yearsInOperation: z
+    .preprocess((val) => {
+      if (val === null || val === undefined || val === "") return null;
+      const parsed = Number(val);
+      return Number.isNaN(parsed) ? val : parsed;
+    }, z.number().int().min(0).nullable().optional()),
 });
 
 export const changePasswordDto = z.object({
