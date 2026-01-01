@@ -4,6 +4,7 @@ import { User, UserRole } from "@prisma/client";
 import userService from "@/services/user.service";
 import { throwError } from "@/utils/responseHandler";
 import { HTTP_STATUS } from "@/constants/constants";
+import { logAudit } from "@/services/activity-log.service";
 
 interface RegisterInput {
   email: string;
@@ -125,6 +126,14 @@ export class AuthService {
       },
     });
 
+    await logAudit(prisma, {
+      actorUserId: authUser.id,
+      action: "AUTH_LOGIN",
+      entityType: "AUTH",
+      metadata: { email: authUser.email },
+      message: "User login successful",
+    });
+
     return { user: authUser, accessToken, refreshToken };
   }
 
@@ -161,6 +170,13 @@ export class AuthService {
           .filter((token) => token !== refreshToken)
           .concat(newRefreshToken),
       },
+    });
+
+    await logAudit(prisma, {
+      actorUserId: authUser.id,
+      action: "AUTH_REFRESH",
+      entityType: "AUTH",
+      message: "Refresh token rotated",
     });
 
     return { accessToken, refreshToken: newRefreshToken };
@@ -201,12 +217,26 @@ export class AuthService {
         refreshTokens: user.refreshTokens.filter((t) => t !== refreshToken),
       },
     });
+
+    await logAudit(prisma, {
+      actorUserId: userId,
+      action: "AUTH_LOGOUT",
+      entityType: "AUTH",
+      message: "User logged out",
+    });
   }
 
   async logoutAll(userId: string) {
     await prisma.user.update({
       where: { id: userId },
       data: { refreshTokens: [] },
+    });
+
+    await logAudit(prisma, {
+      actorUserId: userId,
+      action: "AUTH_LOGOUT_ALL",
+      entityType: "AUTH",
+      message: "User logged out from all sessions",
     });
   }
 

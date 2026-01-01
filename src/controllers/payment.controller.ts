@@ -75,10 +75,15 @@ export const PaymentController = {
     res: Response
   ): Promise<void> => {
     try {
+      const authUser = requireAuthUser(req);
       const { id } = paymentIdParamDto.parse(req.params);
       const payload = updatePaymentStatusDto.parse(req.body);
 
-      const payment = await PaymentService.updatePaymentStatus(id, payload.status);
+      const payment = await PaymentService.updatePaymentStatus(
+        id,
+        payload.status,
+        authUser.userId
+      );
       createResponse(res, HTTP_STATUS.OK, "Payment status updated", payment);
     } catch (error) {
       if (error instanceof ZodError) {

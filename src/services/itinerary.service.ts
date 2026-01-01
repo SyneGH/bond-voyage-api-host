@@ -7,6 +7,7 @@ import {
 } from "@prisma/client";
 import { prisma } from "@/config/database";
 import { serializeItinerary } from "@/utils/serialize";
+import { logAudit } from "@/services/activity-log.service";
 
 interface UpsertItineraryInput {
   userId?: string;
@@ -65,6 +66,15 @@ export const ItineraryService = {
           : undefined,
       },
       include: itineraryIncludes,
+    });
+
+    await logAudit(prisma, {
+      actorUserId: data.userId,
+      action: "ITINERARY_CREATED",
+      entityType: "ITINERARY",
+      entityId: itinerary.id,
+      metadata: { destination: data.destination },
+      message: `Created itinerary ${itinerary.id}`,
     });
 
     return serializeItinerary(itinerary);
@@ -152,6 +162,15 @@ export const ItineraryService = {
         include: itineraryIncludes,
       });
 
+      await logAudit(tx, {
+        actorUserId: userId,
+        action: "ITINERARY_UPDATED",
+        entityType: "ITINERARY",
+        entityId: id,
+        metadata: { destination, travelers },
+        message: `Updated itinerary ${id}`,
+      });
+
       return serializeItinerary(updated);
     });
   },
@@ -192,6 +211,14 @@ export const ItineraryService = {
       },
       include: itineraryIncludes,
     });
+
+    await logAudit(prisma, {
+      actorUserId: userId,
+      action: "ITINERARY_SENT",
+      entityType: "ITINERARY",
+      entityId: id,
+      message: `Sent itinerary ${id}`,
+    });
     return serializeItinerary(updated);
   },
 
@@ -219,6 +246,14 @@ export const ItineraryService = {
       },
       include: itineraryIncludes,
     });
+
+    await logAudit(prisma, {
+      actorUserId: userId,
+      action: "ITINERARY_CONFIRMED",
+      entityType: "ITINERARY",
+      entityId: id,
+      message: `Confirmed itinerary ${id}`,
+    });
     return serializeItinerary(updated);
   },
 
@@ -234,14 +269,31 @@ export const ItineraryService = {
         update: {},
         create: { itineraryId: id, userId: collaboratorId, invitedById: ownerId },
       });
+      await logAudit(tx, {
+        actorUserId: ownerId,
+        action: "ITINERARY_COLLABORATOR_ADDED",
+        entityType: "ITINERARY",
+        entityId: id,
+        metadata: { collaboratorId },
+        message: `Added collaborator ${collaboratorId} to itinerary ${id}`,
+      });
       return collab;
     });
   },
 
   async removeCollaborator(id: string, ownerId: string, collaboratorId: string) {
-    return prisma.itineraryCollaborator.deleteMany({
+    const removed = await prisma.itineraryCollaborator.deleteMany({
       where: { itineraryId: id, userId: collaboratorId, itinerary: { userId: ownerId } },
     });
+    await logAudit(prisma, {
+      actorUserId: ownerId,
+      action: "ITINERARY_COLLABORATOR_REMOVED",
+      entityType: "ITINERARY",
+      entityId: id,
+      metadata: { collaboratorId },
+      message: `Removed collaborator ${collaboratorId} from itinerary ${id}`,
+    });
+    return removed;
   },
 
   async listCollaborators(id: string, viewerId: string) {
