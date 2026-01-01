@@ -32,12 +32,19 @@ export const BookingController = {
       const booking = await BookingService.createBooking({
         ...payload,
         userId: authUser.userId,
+        role: authUser.role,
       });
 
       createResponse(res, HTTP_STATUS.CREATED, "Booking created", booking);
     } catch (error) {
       if (error instanceof ZodError) {
         throwError(HTTP_STATUS.BAD_REQUEST, "Validation failed", error.errors);
+      }
+      if (error instanceof Error && error.message === "ITINERARY_NOT_FOUND") {
+        throwError(HTTP_STATUS.NOT_FOUND, "Itinerary not found");
+      }
+      if (error instanceof Error && error.message === "ITINERARY_FORBIDDEN") {
+        throwError(HTTP_STATUS.FORBIDDEN, "Forbidden");
       }
       if (error instanceof AppError) {
         throw error;
@@ -69,8 +76,8 @@ export const BookingController = {
       const bookingRecord = booking as NonNullable<typeof booking>;
 
       if (authUser.role !== "ADMIN" && bookingRecord.userId !== authUser.userId) {
-        const isCollaborator = bookingRecord.collaborators?.some(
-          (collab) => collab.userId === authUser.userId
+        const isCollaborator = bookingRecord.itinerary?.collaborators?.some(
+          (collab: { userId: string }) => collab.userId === authUser.userId
         );
 
         if (!isCollaborator) {

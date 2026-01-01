@@ -49,20 +49,35 @@ const itineraryDayDto = z.object({
   activities: z.array(activityDto).min(1),
 });
 
+const inlineItineraryDto = z
+  .object({
+    title: z.string().optional().nullable(),
+    destination: z.string().min(1),
+    startDate: dateSchema.optional().nullable(),
+    endDate: dateSchema.optional().nullable(),
+    travelers: z.number().int().min(1),
+    type: z.enum(["STANDARD", "CUSTOMIZED", "REQUESTED"]).optional(),
+    tourType: z.enum(["JOINER", "PRIVATE"]).optional(),
+    days: z.array(itineraryDayDto).optional(),
+  })
+  .refine((data) => {
+    if (data.startDate && data.endDate) {
+      return data.endDate >= data.startDate;
+    }
+    return true;
+  }, "End date must be on or after start date");
+
 export const createBookingDto = z
   .object({
-    destination: z.string().min(1),
-    startDate: dateSchema,
-    endDate: dateSchema,
-    travelers: z.number().int().min(1),
+    itineraryId: z.string().uuid().optional(),
+    itinerary: inlineItineraryDto.optional(),
     totalPrice: z.number().min(0),
-    type: z.enum(["STANDARD", "CUSTOMIZED", "REQUESTED"]),
-    tourType: z.enum(["JOINER", "PRIVATE"]),
-    itinerary: z.array(itineraryDayDto).min(1),
+    type: z.enum(["STANDARD", "CUSTOMIZED", "REQUESTED"]).optional(),
+    tourType: z.enum(["JOINER", "PRIVATE"]).optional(),
   })
-  .refine((data) => data.endDate >= data.startDate, {
-    message: "End date must be on or after start date",
-    path: ["endDate"],
+  .refine((data) => data.itineraryId || data.itinerary, {
+    message: "itineraryId or itinerary is required",
+    path: ["itineraryId"],
   });
 
 export const updateItineraryDto = z

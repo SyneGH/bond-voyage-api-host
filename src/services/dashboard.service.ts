@@ -82,6 +82,8 @@ export const DashboardService = {
 
     const historical = Array.from({ length: 12 }, () => 0);
     bookingsInYear.forEach((booking) => {
+      if (!booking.startDate) return;
+
       const monthIndex = booking.startDate.getUTCMonth();
       if (monthIndex >= 0 && monthIndex < 12) {
         historical[monthIndex] += 1;
