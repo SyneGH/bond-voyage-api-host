@@ -4,7 +4,7 @@
   "description": "Node.js authentication boilerplate with Prisma and PostgreSQL",
   "main": "dist/index.js",
   "scripts": {
-    "build": "tsc && tsc-alias",
+    "build": "prisma generate && tsc && tsc-alias",
     "start": "node -r tsconfig-paths/register dist/server.js",
     "dev": "ts-node-dev --respawn --transpile-only -r tsconfig-paths/register src/server.ts",
     "db:generate": "prisma generate",
