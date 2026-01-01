@@ -29,6 +29,7 @@ router.use("/payments", paymentRoutes);
 router.use("/inquiries", inquiryRoutes);
 router.use("/feedback", feedbackRoutes);
 router.use("/activity-logs", activityLogRoutes);
+router.use("/admin/audit-logs", activityLogRoutes);
 router.use("/notifications", notificationRoutes);
 router.use("/weather", weatherRoutes);
 router.use("/routes", routeRoutes);

@@ -1,6 +1,6 @@
 import { prisma } from "@/config/database";
 import { Prisma } from "@prisma/client";
-import { logActivity } from "@/services/activity-log.service";
+import { logAudit } from "@/services/activity-log.service";
 import { NotificationService } from "@/services/notification.service";
 
 interface CreatePaymentInput {
@@ -44,12 +44,19 @@ export const PaymentService = {
         },
       });
 
-      await logActivity(
-        tx,
-        data.userId,
-        "Submitted Payment",
-        `Submitted payment ${payment.id} for booking ${booking.id}`
-      );
+      await logAudit(tx, {
+        actorUserId: data.userId,
+        action: "PAYMENT_SUBMITTED",
+        entityType: "PAYMENT",
+        entityId: payment.id,
+        metadata: {
+          bookingId: booking.id,
+          bookingCode: booking.bookingCode,
+          amount: data.amount,
+          method: data.method ?? "GCASH",
+        },
+        message: `Submitted payment ${payment.id} for booking ${booking.id}`,
+      });
       await NotificationService.create(
         {
           userId: data.userId,
@@ -84,7 +91,11 @@ export const PaymentService = {
     });
   },
 
-  async updatePaymentStatus(paymentId: string, status: "VERIFIED" | "REJECTED") {
+  async updatePaymentStatus(
+    paymentId: string,
+    status: "VERIFIED" | "REJECTED",
+    actorUserId?: string
+  ) {
     return prisma.$transaction(async (tx) => {
       const payment = await tx.payment.findUnique({
         where: { id: paymentId },
@@ -94,6 +105,21 @@ export const PaymentService = {
       if (!payment) throw new Error("PAYMENT_NOT_FOUND");
 
       const updated = await tx.payment.update({ where: { id: paymentId }, data: { status } });
+
+      if (actorUserId) {
+        await logAudit(tx, {
+          actorUserId,
+          action: status === "VERIFIED" ? "PAYMENT_VERIFIED" : "PAYMENT_REJECTED",
+          entityType: "PAYMENT",
+          entityId: payment.id,
+          metadata: {
+            bookingId: payment.booking.id,
+            bookingCode: payment.booking.bookingCode,
+            status,
+          },
+          message: `Payment ${payment.id} marked as ${status}`,
+        });
+      }
 
       await NotificationService.create(
         {

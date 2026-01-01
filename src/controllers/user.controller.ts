@@ -448,7 +448,7 @@ class UserController {
     res: Response
   ): Promise<void> => {
     try {
-      const { page, limit, type, dateFrom, dateTo } =
+      const { page, limit, type, action, entityType, entityId, dateFrom, dateTo } =
         activityLogListQueryDto.omit({ actorId: true }).parse(req.query);
 
       const authUser = requireAuthUser(req);
@@ -457,7 +457,9 @@ class UserController {
         page,
         limit,
         actorId: authUser.userId,
-        type,
+        action: action ?? type,
+        entityType,
+        entityId,
         dateFrom,
         dateTo,
       });
