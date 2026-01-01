@@ -1,31 +1,29 @@
 # Phase D Handoff
 
 ## Endpoints
-- POST /api/itineraries
-- GET /api/itineraries/:id
-- GET /api/itineraries
-- PATCH /api/itineraries/:id
-- DELETE /api/itineraries/:id
-- PATCH /api/itineraries/:id/send
-- PATCH /api/itineraries/:id/confirm
-- POST /api/itineraries/:id/collaborators
-- GET /api/itineraries/:id/collaborators
-- DELETE /api/itineraries/:id/collaborators/:userId
-- POST /api/bookings
-- GET /api/bookings/:id
-- GET /api/bookings/my-bookings
-- GET /api/bookings/shared-with-me
-- GET /api/bookings/admin/bookings
-- PATCH /api/bookings/:id/status
-- PATCH /api/bookings/:id/payment
-- GET /api/weather/forecast
-- GET /api/faqs
-- POST /api/upload/itinerary-thumbnail
-- GET /api/users/me/stats
-- GET /api/users/me/activity-logs
+- POST /api/v1/itineraries
+- GET /api/v1/itineraries/:id
+- GET /api/v1/itineraries
+- PATCH /api/v1/itineraries/:id
+- DELETE /api/v1/itineraries/:id
+- PATCH /api/v1/itineraries/:id/send
+- PATCH /api/v1/itineraries/:id/confirm
+- POST /api/v1/itineraries/:id/collaborators
+- GET /api/v1/itineraries/:id/collaborators
+- DELETE /api/v1/itineraries/:id/collaborators/:userId
+- POST /api/v1/bookings
+- GET /api/v1/bookings/:id
+- GET /api/v1/bookings/my-bookings
+- GET /api/v1/bookings/shared-with-me
+- GET /api/v1/bookings/admin/bookings
+- PATCH /api/v1/bookings/:id/status
+- PATCH /api/v1/bookings/:id/payment
+- GET /api/v1/weather/forecast
+- GET /api/v1/faqs
+- POST /api/v1/upload/itinerary-thumbnail
 
 ## Samples
-- **POST /api/bookings**
+- **POST /api/v1/bookings**
 ```json
 {
   "itineraryId": "<itinerary-id>",
@@ -42,7 +40,7 @@ Response snippet:
 }
 ```
 
-- **GET /api/itineraries**
+- **GET /api/v1/itineraries**
 ```json
 {
   "data": [
@@ -51,7 +49,7 @@ Response snippet:
 }
 ```
 
-- **GET /api/faqs**
+- **GET /api/v1/faqs**
 ```json
 {
   "data": [
@@ -60,7 +58,7 @@ Response snippet:
 }
 ```
 
-- **GET /api/weather/forecast**
+- **GET /api/v1/weather/forecast**
 ```json
 {
   "data": {
@@ -74,7 +72,7 @@ Response snippet:
 }
 ```
 
-- **POST /api/upload/itinerary-thumbnail**
+- **POST /api/v1/upload/itinerary-thumbnail**
 ```json
 {
   "url": "https://example.com/thumbnail.png"
@@ -83,41 +81,6 @@ Response snippet:
 Response:
 ```json
 { "data": { "url": "https://example.com/thumbnail.png" } }
-```
-
-- **GET /api/users/me/stats**
-```json
-{
-  "data": {
-    "cards": {
-      "totalBookings": 3,
-      "pendingApprovals": 1,
-      "activeBookings": 1,
-      "completedTrips": 1,
-      "faqsCard": 0
-    },
-    "distributions": {
-      "status": { "completed": 1, "pending": 1, "active": 1, "cancelled": 0 },
-      "type": { "standard": 0, "requested": 1, "customized": 2 }
-    },
-    "trends": {
-      "year": 2025,
-      "labels": ["Jan 2025", "Feb 2025"],
-      "historical": [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-      "predicted": [0, 0, 0, 0, 0, 0]
-    }
-  }
-}
-```
-
-- **GET /api/users/me/activity-logs**
-```json
-{
-  "data": [
-    { "id": "log-1", "action": "CREATE_BOOKING", "timestamp": "2025-02-10T00:00:00.000Z" }
-  ],
-  "meta": { "page": 1, "limit": 10, "total": 1, "totalPages": 1 }
-}
 ```
 
 ## Known Stubs / TODOs
