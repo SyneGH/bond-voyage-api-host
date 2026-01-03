@@ -9,7 +9,7 @@
 
 @localBaseUrl = http://localhost:8087/api/v1
 @prodBaseUrl = https://bond-voyage-api-host.onrender.com/api/v1
-@baseUrl = {{prodBaseUrl}}
+@baseUrl = {{localBaseUrl}}
 
 @email = user@example.com
 @password = User@123

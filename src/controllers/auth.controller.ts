@@ -131,12 +131,15 @@ class AuthController {
         return;
       }
 
+      const incomingToken = req.cookies?.refreshToken;
       const tokenPayload = await authService.refreshToken(refreshToken);
 
-      // Optional: only set cookie if you truly manage cookie refresh here
-      // If you do NOT rotate refresh tokens, you can omit this cookie write entirely.
+      const newRefreshToken = tokenPayload.refreshToken || incomingToken;
+
       const isProduction = process.env.NODE_ENV === "production";
-      res.cookie("refreshToken", refreshToken, {
+      
+      // Set cookie with the NEW token
+      res.cookie("refreshToken", newRefreshToken, {
         httpOnly: true,
         secure: isProduction,
         sameSite: isProduction ? "none" : "lax",
@@ -146,8 +149,16 @@ class AuthController {
       createResponse(res, HTTP_STATUS.OK, "Token refreshed", {
         accessToken: tokenPayload.accessToken,
       });
-    } catch (error) {
+    } catch (error: any) {
+      if (error.name === "TokenExpiredError" || error.name === "JsonWebTokenError") {
+        throwError(HTTP_STATUS.UNAUTHORIZED, "Invalid or expired refresh token");
+      }
+
+      // Pass through existing AppErrors (e.g., if authService throws "User not found")
       if (error instanceof AppError) throw error;
+
+      // Only then default to 500
+      console.error("RefreshToken Unknown Error:", error);
       throwError(HTTP_STATUS.INTERNAL_SERVER_ERROR, "Internal Server Error");
     }
   };
