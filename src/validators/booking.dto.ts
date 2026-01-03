@@ -45,6 +45,7 @@ const activityDto = z.object({
 
 const itineraryDayDto = z.object({
   dayNumber: z.number().int().min(1),
+  title: z.string().optional().nullable(),
   date: dateSchema.optional().nullable(),
   activities: z.array(activityDto).min(1),
 });

@@ -25,10 +25,10 @@ export const PaymentController = {
       let proofSize: number | undefined;
       const maxBytes = 5 * 1024 * 1024;
 
-      if (payload.proofImageBase64) {
-        const base64 = payload.proofImageBase64.includes(",")
-          ? payload.proofImageBase64.split(",").pop()
-          : payload.proofImageBase64;
+      if (payload.proofOfPayment) {
+        const base64 = payload.proofOfPayment.includes(",")
+          ? payload.proofOfPayment.split(",").pop()
+          : payload.proofOfPayment;
 
         if (!base64) {
           throwError(HTTP_STATUS.BAD_REQUEST, "Invalid proof image");

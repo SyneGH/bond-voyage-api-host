@@ -57,7 +57,7 @@ export const RouteController = {
           : totalsFromMatrix.totalTime;
 
       createResponse(res, HTTP_STATUS.OK, "Route optimized", {
-        optimizedActivities,
+        activities: optimizedActivities,
         routeGeometry,
         totalDistance,
         totalTime,

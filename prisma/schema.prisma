@@ -209,6 +209,7 @@ model ItineraryDay {
   itinerary   Itinerary @relation(fields: [itineraryId], references: [id], onDelete: Cascade)
 
   dayNumber Int // 1, 2, 3...
+  title       String?
   date      DateTime?
 
   activities Activity[]
