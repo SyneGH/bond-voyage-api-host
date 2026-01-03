@@ -17,8 +17,8 @@ export class AuthUtils {
     payload: Omit<TokenPayload, "iat" | "exp">
   ): string {
     const options: SignOptions = {
-      expiresIn: (process.env.JWT_ACCESS_EXPIRE ||
-        "14m") as SignOptions["expiresIn"],
+      expiresIn: (process.env.JWT_REFRESH_EXPIRE ||
+        "7d") as SignOptions["expiresIn"],
     };
 
     return jwt.sign(payload, process.env.JWT_REFRESH_SECRET as string, options);

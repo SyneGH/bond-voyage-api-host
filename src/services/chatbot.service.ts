@@ -4,6 +4,13 @@ import { prisma } from "@/config/database";
 import { AppError } from "@/utils/responseHandler";
 import { HTTP_STATUS } from "@/constants/constants";
 
+// Define the Action interface for type safety
+interface ChatAction {
+  label: string;
+  action: string; // The URL path or action key
+  type: "NAVIGATION" | "QUERY"; // NAVIGATION = Redirect, QUERY = Pre-fill chat
+}
+
 type GeminiContent = {
   candidates?: { content?: { parts?: { text?: string }[] } }[];
 };
@@ -59,6 +66,74 @@ function extractJson<T>(text: string, fallback: T): T {
   return fallback;
 }
 
+// NEW: Helper function to determine actions based on user query
+function determineActions(question: string): ChatAction[] {
+  const lowerQ = question.toLowerCase();
+  const actions: ChatAction[] = [];
+
+  // Weather Logic
+  if (lowerQ.includes("weather") || lowerQ.includes("forecast") || lowerQ.includes("rain") || lowerQ.includes("sunny")) {
+    actions.push({
+      label: "Check Weather",
+      action: "/user/weather",
+      type: "NAVIGATION",
+    });
+  }
+
+  // Booking Logic
+  if (lowerQ.includes("book") || lowerQ.includes("reservation") || lowerQ.includes("ticket")) {
+    actions.push({
+      label: "My Bookings",
+      action: "/user/bookings",
+      type: "NAVIGATION",
+    });
+    actions.push({
+      label: "New Booking",
+      action: "/user/standard-itinerary",
+      type: "NAVIGATION",
+    });
+  }
+
+  // Feedback Logic
+  if (lowerQ.includes("feedback") || lowerQ.includes("review") || lowerQ.includes("rate") || lowerQ.includes("complain")) {
+    actions.push({
+      label: "Give Feedback",
+      action: "/user/feedback",
+      type: "NAVIGATION",
+    });
+    actions.push({
+      label: "My Feedback",
+      action: "view my feedback", // Frontend can intercept this specific string if needed
+      type: "QUERY",
+    });
+  }
+
+  // Profile/Account Logic
+  if (lowerQ.includes("profile") || lowerQ.includes("account") || lowerQ.includes("password") || lowerQ.includes("email")) {
+    actions.push({
+      label: "Edit Profile",
+      action: "/user/profile/edit",
+      type: "NAVIGATION",
+    });
+  }
+
+  // Creation/Planning Logic
+  if (lowerQ.includes("create") || lowerQ.includes("plan") || lowerQ.includes("build") || lowerQ.includes("itinerary")) {
+    actions.push({
+      label: "Create New Travel",
+      action: "/user/create-new-travel",
+      type: "NAVIGATION",
+    });
+    actions.push({
+      label: "Use Smart Trip AI",
+      action: "/user/smart-trip",
+      type: "NAVIGATION",
+    });
+  }
+
+  return actions;
+}
+
 export const ChatbotService = {
   async roameo(question: string) {
     const faqs: FaqEntry[] = await prisma.faqEntry.findMany({
@@ -67,21 +142,24 @@ export const ChatbotService = {
       take: 5,
     });
 
-    // Replace the filter logic in the roameo method:
+    // Existing filter logic
     const sources: FaqEntry[] = faqs.filter((faq: FaqEntry) => {
       const queryWords = question.toLowerCase().replace(/[?]/g, '').split(' ').filter(w => w.length > 2);
       const faqText = (faq.question + " " + faq.answer).toLowerCase();
       
-      // Check if at least TWO significant words from the query exist in the FAQ
       const matches = queryWords.filter(word => faqText.includes(word));
       return matches.length >= 2; 
     });
+
+    // NEW: Calculate actions before returning
+    const suggestedActions = determineActions(question);
 
     if (sources.length === 0) {
       return {
         answer: "I'm not sure based on our official FAQs yet. Please contact support for help.",
         confidence: "low" as const,
         sources: [],
+        actions: suggestedActions, // Return actions even if no FAQ found
       };
     }
 
@@ -122,6 +200,7 @@ export const ChatbotService = {
         question: faq.question,
         order: faq.order,
       })),
+      actions: suggestedActions, // Include the actions in the final response
     };
   },
 
@@ -154,7 +233,6 @@ export const ChatbotService = {
     
     const text = await callGemini(fullPrompt);
 
-    // Updated fallback with a more complete "template" if AI fails
     const fallbackDraft = {
       message: "I've put together a starter draft for your Bond Voyage adventure!",
       draft: {
