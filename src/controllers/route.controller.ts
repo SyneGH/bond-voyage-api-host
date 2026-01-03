@@ -79,22 +79,25 @@ const buildNearestNeighborOrder = (
   times: Array<Array<number | null>>
 ): number[] => {
   const total = times.length;
-  if (total === 0) {
-    return [];
+  if (total === 0) return [];
+  if (total === 1) return [0];
+  if (total === 2) return [0, 1];
+
+  const startIndex = 0;
+  const endIndex = total - 1;
+
+  const remainingMiddle = new Set<number>();
+  for (let i = 1; i < endIndex; i += 1) {
+    remainingMiddle.add(i);
   }
 
-  const remaining = new Set<number>();
-  for (let i = 1; i < total; i += 1) {
-    remaining.add(i);
-  }
-
-  const order = [0];
-  while (remaining.size > 0) {
+  const order = [startIndex];
+  while (remainingMiddle.size > 0) {
     const current = order[order.length - 1];
     let nextIndex: number | null = null;
     let bestTime = Number.POSITIVE_INFINITY;
 
-    remaining.forEach((candidate) => {
+    remainingMiddle.forEach((candidate) => {
       const time = times[current]?.[candidate];
       if (typeof time === "number" && time < bestTime) {
         bestTime = time;
@@ -103,17 +106,18 @@ const buildNearestNeighborOrder = (
     });
 
     if (nextIndex === null) {
-      const iter = remaining.values().next();
-        if (iter.done || typeof iter.value !== "number") {
-          break; // no valid next node
-        }
-        nextIndex = iter.value;
+      const iter = remainingMiddle.values().next();
+      if (iter.done || typeof iter.value !== "number") {
+        break; // no valid next node
+      }
+      nextIndex = iter.value;
     }
 
-    remaining.delete(nextIndex);
+    remainingMiddle.delete(nextIndex);
     order.push(nextIndex);
   }
 
+  order.push(endIndex);
   return order;
 };
 
