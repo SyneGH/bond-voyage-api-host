@@ -69,6 +69,10 @@ const inlineItineraryDto = z
 
 export const createBookingDto = z
   .object({
+    customerName: z.string().optional(),
+    customerEmail: z.string().email().optional(),
+    customerMobile: z.string().optional(),
+    
     itineraryId: z.string().uuid().optional(),
     itinerary: inlineItineraryDto.optional(),
     totalPrice: z.number().min(0),

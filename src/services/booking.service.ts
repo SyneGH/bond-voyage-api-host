@@ -86,6 +86,10 @@ interface CreateBookingDTO {
   totalPrice: number;
   type?: BookingType;
   tourType?: TourType;
+
+  customerName?: string;
+  customerEmail?: string;
+  customerMobile?: string;
 }
 
 interface InlineItineraryDTO {
@@ -195,11 +199,15 @@ export const BookingService = {
           startDate: itinerary.startDate ?? undefined,
           endDate: itinerary.endDate ?? undefined,
           travelers: itinerary.travelers,
-          // Prisma Decimal accepts number for many common setups; keep as-is for MVP
+
           totalPrice: data.totalPrice as unknown as Prisma.Decimal,
           type: data.type ?? (itinerary.type as BookingType),
           tourType: data.tourType ?? itinerary.tourType ?? TourType.PRIVATE,
           status: BookingStatus.DRAFT,
+
+          customerName: data.customerName,
+          customerEmail: data.customerEmail,
+          customerMobile: data.customerMobile,
         },
         include: {
           itinerary: {
@@ -261,14 +269,14 @@ export const BookingService = {
     return prisma.booking.findUnique({
       where: { id },
       include: {
-        user: { select: { email: true, firstName: true, lastName: true } },
+        user: { select: { email: true, firstName: true, lastName: true, mobile: true } },
         payments: true,
         itinerary: {
           include: {
             collaborators: {
               include: {
                 user: {
-                  select: { id: true, firstName: true, lastName: true, email: true },
+                  select: { id: true, firstName: true, lastName: true, email: true, mobile: true},
                 },
               },
             },
@@ -675,9 +683,15 @@ export const BookingService = {
 
   async submitBooking(bookingId: string, userId: string) {
     return prisma.$transaction(async (tx) => {
+      const user = await tx.user.findUnique({
+        where: { id: userId },
+        select: { firstName: true, lastName: true }
+      });
+      const userName = `${user?.firstName} ${user?.lastName}`;
+
       const booking = await tx.booking.findFirst({
         where: { id: bookingId, userId },
-        select: { id: true, status: true },
+        select: { id: true, status: true, bookingCode: true },
       });
 
       if (!booking) throw new Error("BOOKING_NOT_FOUND");
@@ -713,7 +727,12 @@ export const BookingService = {
         },
         tx
       );
-
+      await NotificationService.notifyAdmins({
+        type: "BOOKING",
+        title: "Booking Submitted",
+        message: `${userName} submitted booking ${booking.bookingCode} for approval`,
+        data: { bookingId, status: "PENDING" }
+      });
       return updated;
     });
   },

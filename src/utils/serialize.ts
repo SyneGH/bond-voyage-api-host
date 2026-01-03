@@ -11,6 +11,7 @@ import {
 import { BookingDTO } from "@/dtos/booking.dto";
 import { ItineraryDTO } from "@/dtos/itinerary.dto";
 import { NotificationDTO } from "@/dtos/notification.dto";
+import { formatDisplayDate } from "@/utils/dateFormatter";
 
 export const toISO = (date?: Date | null): string | null => {
   if (!date) return null;
@@ -207,6 +208,6 @@ export const serializeNotification = (
     message: notification.message,
     data: (notification.data as any) ?? null,
     isRead: notification.isRead,
-    createdAt: toISO(notification.createdAt) as string,
+    createdAt: formatDisplayDate(notification.createdAt) as string,
   };
 };

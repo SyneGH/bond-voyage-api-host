@@ -20,6 +20,7 @@ import {
   verifyOtpDto,
 } from "@/validators/auth.dto";
 import { serializeUser } from "@/utils/serialize";
+import { NotificationService } from "@/services/notification.service";
 
 class AuthController {
   // =====================================================
@@ -34,6 +35,14 @@ class AuthController {
       if (!user) {
         throwError(HTTP_STATUS.INTERNAL_SERVER_ERROR, "Registration failed");
       }
+
+      const fullName = `${user.firstName} ${user.lastName}`;
+      await NotificationService.notifyAdmins({
+        type: "SYSTEM", // or "USER" if you have that type
+        title: "New User Registration",
+        message: `${fullName} has just signed up.`,
+        data: { userId: user.id, email: user.email }
+      });      
 
       const authUser = user as NonNullable<typeof user>;
       const isProduction = process.env.NODE_ENV === "production";

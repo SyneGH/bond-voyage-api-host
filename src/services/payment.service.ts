@@ -18,6 +18,12 @@ interface CreatePaymentInput {
 export const PaymentService = {
   async createPayment(data: CreatePaymentInput) {
     return prisma.$transaction(async (tx) => {
+      const user = await tx.user.findUnique({
+        where: { id: data.userId },
+        select: { firstName: true, lastName: true }
+      });
+      const userName = `${user?.firstName} ${user?.lastName}`;
+
       const booking = await tx.booking.findFirst({
         where: { id: data.bookingId, userId: data.userId },
         select: {
@@ -77,7 +83,7 @@ export const PaymentService = {
       await NotificationService.notifyAdmins({
         type: "PAYMENT",
         title: "Payment requires verification",
-        message: `Payment for booking ${booking.bookingCode ?? booking.id} is awaiting review`,
+        message: `${userName} submitted a payment for booking ${booking.bookingCode}`,
         data: {
           bookingId: booking.id,
           bookingCode: booking.bookingCode ?? undefined,
