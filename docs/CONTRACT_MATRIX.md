@@ -48,6 +48,10 @@ Canonical request/response contracts for frontend integration. All responses use
 | GET `/notifications` | Bearer | `?isRead&page&limit` | `{ items: NotificationDTO[], meta }` | Pagination meta reused. |
 | PATCH `/notifications/:id/read` | Bearer | — | `{ notification }` | Mark read. |
 | PATCH `/notifications/read-all` | Bearer | — | `{ count }` | Mark all read. |
+| GET `/faqs` | None (public) | `?search&page&limit` | `{ items: FaqDTO[], meta }` | Used by Roameo RAG and User FAQ UI. |
+| POST `/faqs` | Admin | `{ question, answer, tags[], ... }` | `{ faq }` | Creates new FAQ entry. |
+| PUT `/faqs/:id` | Admin | Partial FAQ fields | `{ faq }` | Updates content. |
+| DELETE `/faqs/:id` | Admin | — | `{ message }` | Hard deletes entry. |
 | POST `/chatbots/roameo` | None (public) | `{ question }` | `{ answer, confidence, sources[] }` | FAQ-only; returns 501 if Gemini key missing; rejects out-of-scope. |
 | POST `/chatbots/roaman` | None (public) | `{ prompt, preferences? }` | `{ message, draftItinerary }` | SMART_TRIP draft JSON, no DB write; 501 if Gemini key missing. |
 | GET `/activity-logs` | Admin | `?actorId&action&entityType&entityId&dateFrom&dateTo&page&limit` | `{ items: ActivityLogDTO[], meta }` | Action filter is substring-based; legacy strings may not match enums. |

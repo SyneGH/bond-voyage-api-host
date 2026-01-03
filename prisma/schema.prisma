@@ -470,6 +470,12 @@ model FaqEntry {
   answer    String
   order     Int
   isActive  Boolean  @default(true)
+
+  tags           String[]  @default([])
+  targetPages    String[]  @default([])
+  pageKeywords   String[]  @default([])
+  category       String    @default("user") // Maps to 'systemCategory'
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

@@ -18,7 +18,9 @@ This handoff summarizes the BondVoyage backend for frontend consumers. The API i
 - **Bookings:** Owner-only creation from itinerary (legacy inline supported) with BV-YYYY-NNN codes; list mine/shared; status transitions; collaborator management; admin list/status.
 - **Payments:** Submit payment for booking, fetch proof, admin verify/reject; notifications emitted.
 - **Notifications:** Paginated list, mark single read, mark all read.
-- **AI:** Roameo (FAQ RAG, in-scope only), Roaman (friendly + SMART_TRIP draft JSON, no DB writes).
+- **FAQs:** Public list with search/tags for UI; Admin CRUD (`POST`, `PUT`, `DELETE`) to manage the "Brain" for Roameo.
+- **AI:** - **Roameo:** RAG-based FAQ assistant. Retrieves answers from the `faq_entries` table.
+  - **Roaman:** "Smart Trip" assistant. Scoped to specific destinations; returns friendly text + `draft` JSON itinerary.
 - **Audits:** `/activity-logs` (admin) and `/users/me/activity-logs` (self) with substring action filter; legacy action strings may not match enums.
 
 ## Response Envelope & Serialization
@@ -42,13 +44,12 @@ This handoff summarizes the BondVoyage backend for frontend consumers. The API i
 export BASE="http://localhost:8087/api/v1"
 curl -s "$BASE/health"
 curl -i -c cookies.txt -X POST "$BASE/auth/login" -H 'Content-Type: application/json' \
-  -d '{"email":"test@example.com","password":"password"}'
+  -d '{\"email\":\"test@example.com\",\"password\":\"password\"}'
 curl -b cookies.txt -X POST "$BASE/auth/refresh" -H 'Content-Type: application/json' \
-  -d '{"refreshToken":"<token>"}'
+  -d '{\"refreshToken\":\"<token>\"}'
 curl -b cookies.txt -X POST "$BASE/itineraries" -H 'Content-Type: application/json' \
-  -d '{"destination":"Paris","travelers":2,"startDate":"2025-01-10","endDate":"2025-01-15","days":[{"dayNumber":1,"activities":[{"time":"10:00","title":"Check in","order":1}]}]}'
+  -d '{\"destination\":\"Paris\",\"travelers\":2,\"startDate\":\"2025-01-10\",\"endDate\":\"2025-01-15\",\"days\":[{\"dayNumber\":1,\"activities\":[{\"time\":\"10:00\",\"title\":\"Check in\",\"order\":1}]}]}'
 curl -b cookies.txt -X POST "$BASE/bookings" -H 'Content-Type: application/json' \
-  -d '{"itineraryId":"<itineraryId>","totalPrice":1200}'
+  -d '{\"itineraryId\":\"<itineraryId>\",\"totalPrice\":1200}'
 curl -b cookies.txt -X POST "$BASE/payments/<bookingId>" -H 'Content-Type: application/json' \
-  -d '{"amount":1200,"method":"BANK_TRANSFER","reference":"TX123"}'
-```
+  -d '{\"amount\":1200,\"method\":\"BANK_TRANSFER\",\"reference\":\"TX123\"}'

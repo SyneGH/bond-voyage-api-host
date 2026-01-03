@@ -20,6 +20,7 @@
 | Payment | submit, admin verify/reject | bookingId/bookingCode, amount/method/status only |
 | Inquiry | create, message sent | bookingId, isAdmin flag |
 | Users (admin) | create/update/deactivate/delete | target user id/email |
+| FAQ (admin) | create, update, delete | question snippet |
 
 ## Endpoints
 - **Self logs:** `GET /api/v1/users/me/activity-logs?page=&limit=&action=&entityType=&entityId=&dateFrom=&dateTo=`
