@@ -37,11 +37,19 @@ class AuthController {
       }
 
       const fullName = `${user.firstName} ${user.lastName}`;
+
       await NotificationService.notifyAdmins({
-        type: "SYSTEM", // or "USER" if you have that type
+        type: "SYSTEM",
         title: "New User Registration",
         message: `${fullName} has just signed up.`,
-        data: { userId: user.id, email: user.email }
+        data: { 
+          key: "user_registration", 
+          meta: { 
+            userId: user.id, 
+            email: user.email,
+            name: fullName 
+          } 
+        }
       });      
 
       const authUser = user as NonNullable<typeof user>;
@@ -93,7 +101,6 @@ class AuthController {
         sameSite: isProduction ? "none" : "lax",
         maxAge: toMilliseconds(7, "day"),
       });
-
 
       createResponse(res, HTTP_STATUS.OK, "Login successful", {
         user: serializeUser(authUser),

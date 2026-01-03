@@ -2,6 +2,21 @@ import { z } from "zod";
 import { UserEnum } from "@/types/enums/user.enum";
 import { Regex } from "@/utils/regex";
 
+const dateQuerySchema = z.preprocess((value) => {
+  // 1. If it's null/undefined/empty string, return undefined
+  if (!value || (typeof value === 'string' && value.trim() === '')) {
+    return undefined;
+  }
+  // 2. If it's already a Date, return it
+  if (value instanceof Date) return value;
+  
+  // 3. Try to parse string/number to Date
+  const date = new Date(value as string | number);
+  
+  // 4. Return the Date if valid, otherwise undefined
+  return !Number.isNaN(date.getTime()) ? date : undefined;
+}, z.date().optional());
+
 const parseNumber = (value: unknown, fallback: number) => {
   if (typeof value === "number") {
     return Number.isNaN(value) ? fallback : value;
@@ -61,8 +76,8 @@ export const userListQueryDto = z.object({
       return undefined;
     }, z.boolean().optional()),
 
-  startDate: z.string().optional(),
-  endDate: z.string().optional(),
+  startDate: dateQuerySchema,
+  endDate: dateQuerySchema,
 });
 
 export const userIdParamDto = z.object({
@@ -89,4 +104,11 @@ export const updateUserAdminDto = z.object({
     .regex(Regex.EMAIL_PATTERN)
     .optional(),
   mobile: z.string().optional(),
+  companyName: z.string().optional(),
+  yearsInOperation: z
+    .preprocess((val) => {
+      if (val === null || val === undefined || val === "") return null;
+      const parsed = Number(val);
+      return Number.isNaN(parsed) ? val : parsed;
+    }, z.number().int().min(0).nullable().optional()),
 });

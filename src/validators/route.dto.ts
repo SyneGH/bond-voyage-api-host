@@ -6,6 +6,9 @@ const locationDto = z.object({
 });
 
 export const optimizeRouteDto = z.object({
+  origin: z.string().optional(),
+  destination: z.string().optional(),
+  
   dayId: z.string().optional(),
   mode: z.string().optional(),
   activities: z

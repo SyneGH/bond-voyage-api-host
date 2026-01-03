@@ -5,6 +5,17 @@ import { BCRYPT_SALT_ROUNDS } from "@/constants/constants";
 import { RegisterDto, UserUpdateDto } from "@/types";
 import { logAudit } from "./activity-log.service";
 
+// Define the shape of the query object based on your DTO
+interface UserQuery {
+  page: number;
+  limit: number;
+  q?: string;
+  role?: "ADMIN" | "USER";
+  isActive?: boolean;
+  startDate?: Date;
+  endDate?: Date;
+}
+
 export class UserService {
   async findByEmail(email: string): Promise<User | null> {
     return prisma.user.findUnique({
@@ -55,25 +66,22 @@ export class UserService {
       }
     }
 
-    // Add birthday if provided - handle string conversion
+    // [DATE HANDLING] - Birthday
+    // Store as UTC Midnight to prevent timezone shifts (e.g. becoming previous day)
     if (data.birthday) {
       const birthdayString = String(data.birthday).trim();
       if (birthdayString) {
         const birthdayDate = new Date(birthdayString);
         
-        // Validate it's a valid date
         if (!isNaN(birthdayDate.getTime())) {
+          // Force to UTC midnight if needed, or keep standard parsing
+          // Standard parsing of "YYYY-MM-DD" is usually UTC midnight already.
           userData.birthday = birthdayDate;
         } else {
           console.warn('⚠️ Invalid birthday format, skipping:', data.birthday);
         }
       }
     }
-
-    console.log('Creating user with data:', {
-      ...userData,
-      password: '[REDACTED]'
-    });
 
     return await prisma.user.create({
       data: userData,
@@ -96,13 +104,73 @@ export class UserService {
     return user;
   }
 
-  async findMany(params: {
-    skip?: number;
-    take?: number;
-    where?: Prisma.UserWhereInput;
-    orderBy?: Prisma.UserOrderByWithRelationInput;
-  }): Promise<User[]> {
-    return prisma.user.findMany(params);
+  // --- NEW: ROBUST FIND ALL WITH DATE LOGIC ---
+  async findAll(query: UserQuery) {
+    const { page, limit, q, role, isActive, startDate, endDate } = query;
+    const skip = (page - 1) * limit;
+
+    // Build the dynamic WHERE clause
+    const where: Prisma.UserWhereInput = {};
+
+    // 1. Text Search (Case insensitive)
+    if (q) {
+      where.OR = [
+        { email: { contains: q, mode: "insensitive" } },
+        { firstName: { contains: q, mode: "insensitive" } },
+        { lastName: { contains: q, mode: "insensitive" } },
+        { companyName: { contains: q, mode: "insensitive" } },
+      ];
+    }
+
+    // 2. Exact Filters
+    if (role) {
+      where.role = role;
+    }
+    if (isActive !== undefined) {
+      where.isActive = isActive;
+    }
+
+    // 3. [DATE HANDLING] - Created At Range
+    // Applies the "Full Day" logic to align with Frontend expectations
+    if (startDate || endDate) {
+      where.createdAt = {};
+
+      if (startDate) {
+        // Set to Start of Day (00:00:00.000)
+        const start = new Date(startDate);
+        start.setHours(0, 0, 0, 0);
+        where.createdAt.gte = start;
+      }
+
+      if (endDate) {
+        // Set to End of Day (23:59:59.999)
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        where.createdAt.lte = end;
+      }
+    }
+
+    // Execute queries in parallel for performance
+    const [users, total] = await Promise.all([
+      prisma.user.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { createdAt: "desc" }, // Show newest users first
+      }),
+      prisma.user.count({ where }),
+    ]);
+
+    // Return standardized pagination response
+    return {
+      users: users.map((u) => this.transformUser(u)), // Hide passwords
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      }
+    };
   }
 
   async count(where?: Prisma.UserWhereInput): Promise<number> {
