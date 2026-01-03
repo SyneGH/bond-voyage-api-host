@@ -11,6 +11,6 @@ Current requirement coverage, status, and residual risks.
 | ISO date/decimal serialization | Complete | Serializers return ISO strings; Prisma Decimal to number in DTOs. | Confirm new endpoints use serializers if added. |
 | FAQ/Upload/Weather stubs | Complete | FAQ backed by `FaqEntry` with seed; upload thumbnail stub returns URL; weather normalized with mock fallback. | Upload remains placeholder storage. |
 | Notifications lifecycle | Complete | Structured payload validation; emitted on booking/payment actions; pagination + mark-read endpoints. | No websocket push; relies on polling. |
-| Auth refresh via body-first | Complete | `/auth/refresh` accepts body token with cookie fallback; validators enforce presence. | None. |
+| Auth refresh via body-first | Complete | `/auth/refresh-token` accepts body token with cookie fallback; validators enforce presence. | None. |
 | Chatbots (Roameo/Roaman) | Complete (with env gating) | Gemini-backed; Roameo strict FAQ RAG; Roaman returns friendly message + SMART_TRIP JSON without DB writes. | Returns 501 if Gemini env missing; FAQ search keyword-based only. |
 | Auditing (Phase I) | Complete | Admin/global and self-scoped activity-log queries with pagination and filters. | Action filter substring-based; legacy strings may not match enum names. |

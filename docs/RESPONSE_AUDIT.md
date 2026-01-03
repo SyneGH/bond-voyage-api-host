@@ -25,7 +25,7 @@ Representative responses for frontend contract validation. All examples use the 
 }
 ```
 
-**POST /auth/refresh**
+**POST /auth/refresh-token**
 ```json
 {
   "success": true,

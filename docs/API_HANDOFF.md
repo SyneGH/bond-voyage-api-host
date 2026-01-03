@@ -9,7 +9,7 @@ This handoff summarizes the BondVoyage backend for frontend consumers. The API i
 
 ## Auth Flow
 - `POST /auth/login` — `{ email, password }` → `{ user, accessToken, refreshToken }` (cookie set for refresh).
-- `POST /auth/refresh` — Prefer body `{ refreshToken }`, cookie fallback → `{ accessToken }`.
+- `POST /auth/refresh-token` — Prefer body `{ refreshToken }`, cookie fallback → `{ accessToken }`.
 - `GET /auth/profile` — Returns caller profile (includes `yearsInOperation`, ISO date strings).
 
 ## Core Domains & Key Endpoints

@@ -5,7 +5,7 @@ Canonical request/response contracts for frontend integration. All responses use
 | Endpoint | Auth | Request (minimal) | Response (minimal) | Notes |
 | --- | --- | --- | --- | --- |
 | POST `/auth/login` | None | `{ email, password }` | `{ user, accessToken, refreshToken }` | Sets `refreshToken` cookie; user includes `yearsInOperation` and ISO dates. |
-| POST `/auth/refresh` | Optional cookie | `{ refreshToken }` (body preferred) | `{ accessToken }` | Body token takes precedence over cookie. |
+| POST `/auth/refresh-token` | Optional cookie | `{ refreshToken }` (body preferred) | `{ accessToken }` | Body token takes precedence over cookie. |
 | GET `/auth/profile` | Bearer | — | `{ user }` | Self profile. |
 | PATCH `/users/profile` | Bearer | Profile fields incl. `yearsInOperation` | `{ user }` | Self update. |
 | GET `/users/me/stats` | Bearer | — | `{ cards, trends, distributions }` | Cards currently zeroed per product request. |

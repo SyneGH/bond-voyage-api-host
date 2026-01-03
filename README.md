@@ -129,7 +129,7 @@ npm run db:seed      # Seed database with initial data
 | ------ | ---------------- | ----------------------- | ------- |
 | POST   | `/register`      | Register new user       | Public  |
 | POST   | `/login`         | User login              | Public  |
-| POST   | `/auth/refresh` | Refresh access token    | Public  |
+| POST   | `/auth/refresh-token` | Refresh access token    | Public  |
 | POST   | `/logout`        | Logout user             | Private |
 | POST   | `/logout-all`    | Logout from all devices | Private |
 | GET    | `/profile`       | Get user profile        | Private |

@@ -1,7 +1,7 @@
 # PHASE G1 HANDOFF — Auth Refresh (Body + Cookie)
 
 ## Endpoint
-- `POST /api/v1/auth/refresh`
+- `POST /api/v1/auth/refresh-token`
   - Request (JSON): `{ "refreshToken": "<token>" }`
   - Fallback: cookie `refreshToken` when body is absent.
   - Precedence: body token wins over cookie.
@@ -11,14 +11,14 @@
 ## Curl Examples
 - Body token
 ```bash
-curl -X POST http://localhost:8087/api/v1/auth/refresh \
+curl -X POST http://localhost:8087/api/v1/auth/refresh-token \
   -H "Content-Type: application/json" \
   -d '{"refreshToken":"<refresh-token>"}'
 ```
 
 - Cookie fallback
 ```bash
-curl -X POST http://localhost:8087/api/v1/auth/refresh \
+curl -X POST http://localhost:8087/api/v1/auth/refresh-token \
   -H "Content-Type: application/json" \
   --cookie "refreshToken=<refresh-token>"
 ```

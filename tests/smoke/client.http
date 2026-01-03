@@ -9,7 +9,7 @@
 
 @localBaseUrl = http://localhost:8087/api/v1
 @prodBaseUrl = https://bond-voyage-api-host.onrender.com/api/v1
-@baseUrl = {{localBaseUrl}}
+@baseUrl = {{prodBaseUrl}}
 
 @email = user@example.com
 @password = User@123
@@ -36,7 +36,7 @@ GET {{baseUrl}}/health
 ### CORS preflight (adjust Origin to match CORS_ORIGINS)
 # Expected: 204/200
 OPTIONS {{baseUrl}}/health
-Origin: http://localhost:3000
+Origin: https://bond-voyage.vercel.app
 Access-Control-Request-Method: GET
 
 ### ======================================================
@@ -48,13 +48,13 @@ POST {{baseUrl}}/auth/register
 Content-Type: application/json
 
 {
-  "firstName": "Admin",
-  "lastName": "User",
-  "email": "{{adminEmail}}",
-  "mobile": "09987654321",
-  "password": "{{adminPassword}}",
+  "firstName": "Felix",
+  "lastName": "Melgar",
+  "email": "felixangelomelgar5@gmail.com",
+  "mobile": "09612133522",
+  "password": "Felix@123",
   "role": "ADMIN",
-  "birthday": "2000-01-01"
+  "birthday": "2004-05-05"
 }
 
 ### Register user
@@ -79,8 +79,8 @@ POST {{baseUrl}}/auth/login
 Content-Type: application/json
 
 {
-  "email": "{{adminEmail}}",
-  "password": "{{adminPassword}}"
+  "email": "felixangelomelgar5@gmail.com",
+  "password": "Felix@1234"
 }
 
 ###
@@ -130,7 +130,7 @@ Content-Type: application/json
 
 ### Refresh token (requires refreshToken cookie from login)
 # Expected: 200 OK
-POST {{baseUrl}}/auth/refresh
+POST {{baseUrl}}/auth/refresh-token
 
 ### Profile
 # Expected: 200 OK
@@ -153,7 +153,7 @@ POST {{baseUrl}}/auth/send-otp
 Content-Type: application/json
 
 {
-  "email": "{{email}}",
+  "email": "felixangelomelgar5@gmail.com",
   "firstName": "Felix"
 }
 
@@ -163,8 +163,8 @@ POST {{baseUrl}}/auth/verify-otp
 Content-Type: application/json
 
 {
-  "email": "{{email}}",
-  "otp": "216844"
+  "email": "felixangelomelgar5@gmail.com",
+  "otp": "597871"
 }
 
 ### Reset password (requires verified OTP session)
@@ -173,8 +173,8 @@ POST {{baseUrl}}/auth/reset-password
 Content-Type: application/json
 
 {
-  "email": "{{email}}",
-  "newPassword": "NewPassword456!"
+  "email": "felixangelomelgar5@gmail.com",
+  "newPassword": "Felix@1234"
 }
 
 ### Reset password without OTP

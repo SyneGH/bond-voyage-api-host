@@ -38,7 +38,7 @@ _Auth required unless noted; all responses wrapped in the standard envelope. Pag
 
 ### Auth
 - **POST /auth/login** — Body `{ email, password }`; returns `{ user, accessToken, refreshToken }` and sets `refreshToken` cookie.
-- **POST /auth/refresh** — Body `{ refreshToken }` preferred; falls back to `refreshToken` cookie; returns `{ accessToken }`.
+- **POST /auth/refresh-token** — Body `{ refreshToken }` preferred; falls back to `refreshToken` cookie; returns `{ accessToken }`.
 - **GET /auth/profile** — Requires auth; returns current user profile.
 
 ### Users (Self scope)
@@ -139,7 +139,7 @@ curl -i -c cookies.txt -X POST "$BASE/auth/login" -H 'Content-Type: application/
   -d '{"email":"test@example.com","password":"password"}'
 
 # 3) Refresh (body-first, cookie fallback)
-curl -b cookies.txt -X POST "$BASE/auth/refresh" -H 'Content-Type: application/json' \
+curl -b cookies.txt -X POST "$BASE/auth/refresh-token" -H 'Content-Type: application/json' \
   -d '{"refreshToken":"<from-login-if-needed>"}'
 
 # 4) Create itinerary
