@@ -24,6 +24,11 @@ const dayDto = z.object({
   activities: z.array(activityDto).min(1),
 });
 
+const versionNumberSchema = z.preprocess((val) => {
+  const num = Number(val);
+  return Number.isNaN(num) ? val : num;
+}, z.number().int().min(1));
+
 export const createItineraryDto = z.object({
   title: z.string().optional().nullable(),
   destination: z.string().min(1),
@@ -51,6 +56,7 @@ export const updateItineraryDtoV2 = z.object({
   type: z.enum(["STANDARD", "CUSTOMIZED", "REQUESTED", "SMART_TRIP"]).optional(),
   tourType: z.enum(["JOINER", "PRIVATE"]).optional(),
   days: z.array(dayDto).optional(),
+  version: versionNumberSchema,
 }).refine((data) => {
   if (data.startDate && data.endDate) {
     return data.endDate >= data.startDate;
@@ -64,6 +70,14 @@ export const itineraryIdParamDto = z.object({
 
 export const collaboratorParamDto = z.object({
   userId: z.string().uuid(),
+});
+
+export const itineraryVersionParamDto = z.object({
+  versionId: z.string().uuid(),
+});
+
+export const restoreItineraryDto = z.object({
+  version: versionNumberSchema,
 });
 
 export const collaboratorPayloadDto = z.object({

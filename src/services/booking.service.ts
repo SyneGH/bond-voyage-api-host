@@ -1,6 +1,7 @@
 import {
   BookingStatus,
   BookingType,
+  ItineraryStatus,
   ItineraryType,
   Prisma,
   TourType,
@@ -9,12 +10,58 @@ import { Role } from "@/constants/constants";
 import { prisma } from "@/config/database";
 import { logAudit } from "@/services/activity-log.service";
 import { NotificationService } from "@/services/notification.service";
+import { toISO } from "@/utils/serialize";
 
 const BOOKING_CODE_PREFIX = "BV";
 const BOOKING_CODE_PADDING = 3;
 
 const buildBookingCode = (year: number, sequence: number) =>
   `${BOOKING_CODE_PREFIX}-${year}-${String(sequence).padStart(BOOKING_CODE_PADDING, "0")}`;
+
+const buildItinerarySnapshot = (itinerary: {
+  id: string;
+  userId: string;
+  title?: string | null;
+  destination: string;
+  startDate?: Date | null;
+  endDate?: Date | null;
+  travelers: number;
+  estimatedCost?: Prisma.Decimal | number | null;
+  type: ItineraryType;
+  status: ItineraryStatus;
+  tourType: TourType;
+  days?: { dayNumber: number; title?: string | null; date?: Date | null; activities?: { time: string; title: string; description?: string | null; location?: string | null; icon?: string | null; order: number }[] }[];
+}) => ({
+  id: itinerary.id,
+  userId: itinerary.userId,
+  title: itinerary.title ?? null,
+  destination: itinerary.destination,
+  startDate: toISO(itinerary.startDate),
+  endDate: toISO(itinerary.endDate),
+  travelers: itinerary.travelers,
+  estimatedCost:
+    itinerary.estimatedCost !== null && itinerary.estimatedCost !== undefined
+      ? Number((itinerary.estimatedCost as any).toString?.() ?? itinerary.estimatedCost)
+      : null,
+  type: itinerary.type,
+  status: itinerary.status,
+  tourType: itinerary.tourType,
+  days:
+    itinerary.days?.map((day) => ({
+      dayNumber: day.dayNumber,
+      title: day.title ?? null,
+      date: toISO(day.date),
+      activities:
+        day.activities?.map((activity) => ({
+          time: activity.time,
+          title: activity.title,
+          description: activity.description ?? null,
+          location: activity.location ?? null,
+          icon: activity.icon ?? null,
+          order: activity.order,
+        })) ?? [],
+    })) ?? [],
+});
 
 const ensureBookingSequence = async (
   tx: Prisma.TransactionClient,
@@ -120,8 +167,10 @@ interface UpdateBookingItineraryDTO {
   endDate: Date;
   travelers: number;
   totalPrice: number;
+  version: number;
   itinerary: {
     dayNumber: number;
+    title?: string | null;
     date?: Date | null;
     activities: {
       time: string;
@@ -179,6 +228,17 @@ export const BookingService = {
 
       if (!itinerary) {
         throw new Error("ITINERARY_NOT_FOUND");
+      }
+
+      if (shouldCreateItinerary) {
+        await tx.itineraryVersion.create({
+          data: {
+            itineraryId: itinerary.id,
+            version: itinerary.version,
+            snapshot: buildItinerarySnapshot(itinerary),
+            createdById: data.userId,
+          },
+        });
       }
 
       const isOwner = itinerary.userId === data.userId;
@@ -305,7 +365,11 @@ export const BookingService = {
     return prisma.$transaction(async (tx) => {
       const booking = await tx.booking.findUnique({
         where: { id: bookingId },
-        include: { itinerary: { include: { collaborators: true } } },
+        include: {
+          itinerary: {
+            include: { collaborators: true, days: { include: { activities: true } } },
+          },
+        },
       });
 
       if (!booking) throw new Error("BOOKING_NOT_FOUND");
@@ -323,31 +387,57 @@ export const BookingService = {
         throw new Error("BOOKING_COLLABORATOR_NOT_ALLOWED");
       }
 
-        if (isOwner && !["DRAFT", "PENDING", "REJECTED"].includes(booking.status)) {
-          throw new Error("BOOKING_NOT_EDITABLE");
-        }
+      if (isOwner && !["DRAFT", "PENDING", "REJECTED"].includes(booking.status)) {
+        throw new Error("BOOKING_NOT_EDITABLE");
+      }
 
-        const destination = data.destination ?? booking.destination ?? undefined;
-        const travelers = data.travelers ?? booking.travelers ?? undefined;
+      const destination = data.destination ?? booking.destination ?? undefined;
+      const travelers = data.travelers ?? booking.travelers ?? undefined;
 
-        await tx.itineraryDay.deleteMany({ where: { itineraryId: booking.itineraryId } });
-
-        await tx.itinerary.update({
-          where: { id: booking.itineraryId },
-          data: {
-            destination: data.destination,
-            startDate: data.startDate,
-            endDate: data.endDate,
-            travelers: data.travelers,
-            days: {
-            create: data.itinerary.map((day) => ({
-              dayNumber: day.dayNumber,
-              date: day.date,
-              activities: { create: day.activities },
-            })),
-          },
+      const itineraryUpdateResult = await tx.itinerary.updateMany({
+        where: { id: booking.itineraryId, version: data.version },
+        data: {
+          destination: data.destination,
+          startDate: data.startDate,
+          endDate: data.endDate,
+          travelers: data.travelers,
+          version: { increment: 1 },
         },
       });
+
+      if (itineraryUpdateResult.count === 0) {
+        throw new Error("ITINERARY_VERSION_CONFLICT");
+      }
+
+      await tx.itineraryDay.deleteMany({ where: { itineraryId: booking.itineraryId } });
+
+      for (const day of data.itinerary) {
+        await tx.itineraryDay.create({
+          data: {
+            itineraryId: booking.itineraryId,
+            dayNumber: day.dayNumber,
+            title: day.title ?? undefined,
+            date: day.date ?? undefined,
+            activities: { create: day.activities },
+          },
+        });
+      }
+
+      const refreshedItinerary = await tx.itinerary.findUnique({
+        where: { id: booking.itineraryId },
+        include: { collaborators: true, days: { include: { activities: true } } },
+      });
+
+      if (refreshedItinerary) {
+        await tx.itineraryVersion.create({
+          data: {
+            itineraryId: refreshedItinerary.id,
+            version: refreshedItinerary.version,
+            snapshot: buildItinerarySnapshot(refreshedItinerary),
+            createdById: userId,
+          },
+        });
+      }
 
       const updated = await tx.booking.update({
         where: { id: bookingId },

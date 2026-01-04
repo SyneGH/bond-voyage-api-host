@@ -133,6 +133,7 @@ model User {
   messages              Message[]
   notifications         Notification[]
   paymentSubmissions    Payment[]               @relation("payment_submissions")
+  createdItineraryVersions ItineraryVersion[]   @relation("itinerary_versions_created")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -176,6 +177,7 @@ model Itinerary {
   type     ItineraryType   @default(CUSTOMIZED)
   status   ItineraryStatus @default(DRAFT)
   tourType TourType        @default(PRIVATE)
+  version  Int             @default(1)
 
   // Track Admin-to-User flow for "Requested" itineraries
   sentStatus      String? // e.g., "Draft", "Sent to User"
@@ -192,11 +194,28 @@ model Itinerary {
   collaborators ItineraryCollaborator[]
   bookings      Booking[]
   inquiries     Inquiry[]
+  versions      ItineraryVersion[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@map("itineraries")
+}
+
+model ItineraryVersion {
+  id          String   @id @default(uuid())
+  itineraryId String
+  itinerary   Itinerary @relation(fields: [itineraryId], references: [id], onDelete: Cascade)
+
+  version  Int
+  snapshot Json
+  createdById String?
+  createdBy   User?    @relation("itinerary_versions_created", fields: [createdById], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@unique([itineraryId, version])
+  @@map("itinerary_versions")
 }
 
 // =========================================

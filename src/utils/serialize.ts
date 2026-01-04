@@ -57,6 +57,7 @@ export const serializeItinerary = (itinerary?: SerializedItineraryInput | null):
     estimatedCost: decimalToNumber((itinerary as any).estimatedCost),
     type: itinerary.type,
     status: itinerary.status,
+    version: (itinerary as any).version ?? 1,
     tourType: itinerary.tourType,
     sentStatus: itinerary.sentStatus ?? null,
     requestedStatus: itinerary.requestedStatus,

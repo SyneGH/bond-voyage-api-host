@@ -135,6 +135,9 @@ export const BookingController = {
       if (error?.message === "BOOKING_FORBIDDEN") {
         throwError(HTTP_STATUS.FORBIDDEN, "Forbidden");
       }
+      if (error?.message === "ITINERARY_VERSION_CONFLICT") {
+        throwError(HTTP_STATUS.CONFLICT, "Itinerary version conflict");
+      }
       if (error?.message === "BOOKING_NOT_FOUND") {
         throwError(HTTP_STATUS.NOT_FOUND, "Booking not found");
       }
