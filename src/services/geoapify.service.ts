@@ -66,19 +66,30 @@ export class GeoapifyService {
     return features;
   }
 
-  static async getCoordinates(locationName: string): Promise<Coordinate> {
-    // Reuse the existing autocomplete method
-    const results = await this.autocomplete(locationName, 1);
+  static async getCoordinates(text: string): Promise<Coordinate> {
+    const apiKey = this.getApiKey();
     
-    const feature = results[0] as any;
-    
-    if (!feature || !feature.properties || typeof feature.properties.lat !== 'number') {
-       throwError(HTTP_STATUS.BAD_REQUEST, `Could not resolve location: ${locationName}`);
+    // We use the search endpoint to find the best match for a location string
+    const response = await geoapifyClient.get("/geocode/search", {
+      params: {
+        text,
+        limit: 1,
+        apiKey,
+        filter: "countrycode:ph", // Restrict results to Philippines
+      },
+    });
+
+    const feature = response.data?.features?.[0];
+
+    if (!feature || !feature.properties) {
+      // Return a default or throw based on your preference. 
+      // Throwing ensures we don't route to 0,0 (Atlantic Ocean).
+      throwError(HTTP_STATUS.BAD_REQUEST, `Could not find coordinates for: ${text}`);
     }
 
     return {
       lat: feature.properties.lat,
-      lng: feature.properties.lon // Geoapify returns 'lon', we map to 'lng'
+      lng: feature.properties.lon, // Geoapify returns 'lon', we map to 'lng'
     };
   }
 
