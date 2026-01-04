@@ -50,6 +50,11 @@ const itineraryDayDto = z.object({
   activities: z.array(activityDto).min(1),
 });
 
+const versionNumberSchema = z.preprocess((val) => {
+  const num = Number(val);
+  return Number.isNaN(num) ? val : num;
+}, z.number().int().min(1));
+
 const inlineItineraryDto = z
   .object({
     title: z.string().optional().nullable(),
@@ -93,6 +98,7 @@ export const updateItineraryDto = z
     travelers: z.number().int().min(1),
     totalPrice: z.number().min(0),
     itinerary: z.array(itineraryDayDto).min(1),
+    version: versionNumberSchema,
   })
   .refine((data) => data.endDate >= data.startDate, {
     message: "End date must be on or after start date",

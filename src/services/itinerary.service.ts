@@ -4,9 +4,10 @@ import {
   Prisma,
   RequestStatus,
   TourType,
+  UserRole,
 } from "@prisma/client";
 import { prisma } from "@/config/database";
-import { serializeItinerary } from "@/utils/serialize";
+import { serializeItinerary, toISO } from "@/utils/serialize";
 import { logAudit } from "@/services/activity-log.service";
 
 interface UpsertItineraryInput {
@@ -42,42 +43,139 @@ const itineraryIncludes: Prisma.ItineraryInclude = {
   days: { include: { activities: true }, orderBy: { dayNumber: "asc" } },
 };
 
+type ItinerarySnapshot = {
+  id: string;
+  userId: string;
+  title?: string | null;
+  destination: string;
+  startDate: string | null;
+  endDate: string | null;
+  travelers: number;
+  estimatedCost: number | null;
+  type: ItineraryType;
+  status: ItineraryStatus;
+  tourType: TourType;
+  days: {
+    dayNumber: number;
+    date: string | null;
+    title?: string | null;
+    activities: {
+      time: string;
+      title: string;
+      description?: string | null;
+      location?: string | null;
+      icon?: string | null;
+      order: number;
+    }[];
+  }[];
+};
+
+const buildSnapshot = (itinerary: {
+  id: string;
+  userId: string;
+  title?: string | null;
+  destination: string;
+  startDate?: Date | null;
+  endDate?: Date | null;
+  travelers: number;
+  estimatedCost?: Prisma.Decimal | number | null;
+  type: ItineraryType;
+  status: ItineraryStatus;
+  tourType: TourType;
+  days?: { dayNumber: number; title?: string | null; date?: Date | null; activities?: { time: string; title: string; description?: string | null; location?: string | null; icon?: string | null; order: number }[] }[];
+}): ItinerarySnapshot => ({
+  id: itinerary.id,
+  userId: itinerary.userId,
+  title: itinerary.title ?? null,
+  destination: itinerary.destination,
+  startDate: toISO(itinerary.startDate),
+  endDate: toISO(itinerary.endDate),
+  travelers: itinerary.travelers,
+  estimatedCost:
+    itinerary.estimatedCost !== null && itinerary.estimatedCost !== undefined
+      ? Number((itinerary.estimatedCost as any).toString?.() ?? itinerary.estimatedCost)
+      : null,
+  type: itinerary.type,
+  status: itinerary.status,
+  tourType: itinerary.tourType,
+  days:
+    itinerary.days?.map((day) => ({
+      dayNumber: day.dayNumber,
+      title: day.title ?? null,
+      date: toISO(day.date),
+      activities:
+        day.activities?.map((activity) => ({
+          time: activity.time,
+          title: activity.title,
+          description: activity.description ?? null,
+          location: activity.location ?? null,
+          icon: activity.icon ?? null,
+          order: activity.order,
+        })) ?? [],
+    })) ?? [],
+});
+
+const ensureCanViewItinerary = (itinerary: {
+  userId: string;
+  collaborators: { userId: string }[];
+}, viewerId: string) => {
+  const isOwner = itinerary.userId === viewerId;
+  const isCollaborator = itinerary.collaborators.some((c) => c.userId === viewerId);
+  if (!isOwner && !isCollaborator) {
+    const err: any = new Error("ITINERARY_FORBIDDEN");
+    throw err;
+  }
+};
+
 export const ItineraryService = {
   async create(data: UpsertItineraryInput & { userId: string; destination: string }) {
-    const itinerary = await prisma.itinerary.create({
-      data: {
-        userId: data.userId,
-        title: data.title,
-        destination: data.destination,
+    const itinerary = await prisma.$transaction(async (tx) => {
+      const created = await tx.itinerary.create({
+        data: {
+          userId: data.userId,
+          title: data.title,
+          destination: data.destination,
 
-        startDate: data.startDate ? new Date(data.startDate) : undefined,
-        endDate: data.endDate ? new Date(data.endDate) : undefined,
+          startDate: data.startDate ? new Date(data.startDate) : undefined,
+          endDate: data.endDate ? new Date(data.endDate) : undefined,
 
-        travelers: data.travelers ?? 1,
-        estimatedCost: data.estimatedCost as unknown as Prisma.Decimal,
-        type: data.type ?? ItineraryType.CUSTOMIZED,
-        tourType: data.tourType ?? TourType.PRIVATE,
-        days: data.days
-          ? {
-              create: data.days.map((day) => ({
-                dayNumber: day.dayNumber,
+          travelers: data.travelers ?? 1,
+          estimatedCost: data.estimatedCost as unknown as Prisma.Decimal,
+          type: data.type ?? ItineraryType.CUSTOMIZED,
+          tourType: data.tourType ?? TourType.PRIVATE,
+          days: data.days
+            ? {
+                create: data.days.map((day) => ({
+                  dayNumber: day.dayNumber,
 
-                date: day.date ? new Date(day.date) : undefined,
-                activities: { create: day.activities },
-              })),
-            }
-          : undefined,
-      },
-      include: itineraryIncludes,
-    });
+                  date: day.date ? new Date(day.date) : undefined,
+                  activities: { create: day.activities },
+                })),
+              }
+            : undefined,
+        },
+        include: itineraryIncludes,
+      });
 
-    await logAudit(prisma, {
-      actorUserId: data.userId,
-      action: "ITINERARY_CREATED",
-      entityType: "ITINERARY",
-      entityId: itinerary.id,
-      metadata: { destination: data.destination },
-      message: `Created itinerary ${itinerary.id}`,
+      await tx.itineraryVersion.create({
+        data: {
+          itineraryId: created.id,
+          version: created.version,
+          snapshot: buildSnapshot(created),
+          createdById: data.userId,
+        },
+      });
+
+      await logAudit(tx, {
+        actorUserId: data.userId,
+        action: "ITINERARY_CREATED",
+        entityType: "ITINERARY",
+        entityId: created.id,
+        metadata: { destination: data.destination },
+        message: `Created itinerary ${created.id}`,
+      });
+
+      return created;
     });
 
     return serializeItinerary(itinerary);
@@ -115,11 +213,15 @@ export const ItineraryService = {
     };
   },
 
-  async update(id: string, userId: string, data: UpsertItineraryInput) {
+  async update(
+    id: string,
+    userId: string,
+    data: UpsertItineraryInput & { version: number }
+  ) {
     return prisma.$transaction(async (tx) => {
       const existing = await tx.itinerary.findUnique({
         where: { id },
-        include: { collaborators: true },
+        include: { collaborators: true, days: { include: { activities: true } } },
       });
 
       if (!existing) return null;
@@ -134,35 +236,76 @@ export const ItineraryService = {
         throw err;
       }
 
-      await tx.itineraryDay.deleteMany({ where: { itineraryId: id } });
+      if (isCollaborator && existing.status !== ItineraryStatus.DRAFT) {
+        const err: any = new Error("ITINERARY_FORBIDDEN");
+        throw err;
+      }
 
       const destination = data.destination ?? existing.destination;
       const travelers = data.travelers ?? existing.travelers;
-      const startDate = data.startDate ?? existing.startDate ?? undefined;
-      const endDate = data.endDate ?? existing.endDate ?? undefined;
+      const startDate =
+        data.startDate === undefined
+          ? existing.startDate ?? undefined
+          : data.startDate ?? null;
+      const endDate =
+        data.endDate === undefined ? existing.endDate ?? undefined : data.endDate ?? null;
+      const estimatedCost =
+        data.estimatedCost !== undefined
+          ? (data.estimatedCost as unknown as Prisma.Decimal | null)
+          : existing.estimatedCost;
+      const title = data.title !== undefined ? data.title : existing.title;
+      const type = data.type ?? existing.type;
+      const tourType = data.tourType ?? existing.tourType;
 
-      const updated = await tx.itinerary.update({
-        where: { id },
+      const result = await tx.itinerary.updateMany({
+        where: { id, version: data.version },
         data: {
-          title: data.title,
+          title,
           destination,
           startDate,
           endDate,
           travelers,
-          estimatedCost: data.estimatedCost as unknown as Prisma.Decimal,
-          type: data.type ?? undefined,
-          tourType: data.tourType ?? undefined,
-          days: data.days
-            ? {
-                create: data.days.map((day) => ({
-                  dayNumber: day.dayNumber,
-                  date: day.date ?? undefined,
-                  activities: { create: day.activities },
-                })),
-              }
-            : undefined,
+          estimatedCost,
+          type,
+          tourType,
+          version: { increment: 1 },
         },
+      });
+
+      if (result.count === 0) {
+        const err: any = new Error("ITINERARY_VERSION_CONFLICT");
+        throw err;
+      }
+
+      await tx.itineraryDay.deleteMany({ where: { itineraryId: id } });
+
+      if (data.days) {
+        for (const day of data.days) {
+          await tx.itineraryDay.create({
+            data: {
+              itineraryId: id,
+              dayNumber: day.dayNumber,
+              date: day.date ?? undefined,
+              activities: { create: day.activities },
+            },
+          });
+        }
+      }
+
+      const updated = await tx.itinerary.findUnique({
+        where: { id },
         include: itineraryIncludes,
+      });
+
+      if (!updated) return null;
+
+      await tx.itineraryVersion.create({
+        data: {
+          itineraryId: id,
+          version: updated.version,
+          snapshot: buildSnapshot({ ...updated, days: updated.days }),
+          createdById: userId,
+        },
       });
 
       await logAudit(tx, {
@@ -322,5 +465,154 @@ export const ItineraryService = {
     }
 
     return itinerary.collaborators;
+  },
+
+  async listVersions(itineraryId: string, viewerId: string) {
+    const itinerary = await prisma.itinerary.findUnique({
+      where: { id: itineraryId },
+      include: { collaborators: true },
+    });
+
+    if (!itinerary) return null;
+
+    ensureCanViewItinerary(itinerary, viewerId);
+
+    const versions = await prisma.itineraryVersion.findMany({
+      where: { itineraryId },
+      orderBy: { createdAt: "desc" },
+    });
+
+    return versions.map((version) => ({
+      id: version.id,
+      version: version.version,
+      createdAt: version.createdAt,
+      createdById: version.createdById,
+    }));
+  },
+
+  async getVersionDetail(itineraryId: string, versionId: string, viewerId: string) {
+    const itinerary = await prisma.itinerary.findUnique({
+      where: { id: itineraryId },
+      include: { collaborators: true },
+    });
+
+    if (!itinerary) return null;
+
+    ensureCanViewItinerary(itinerary, viewerId);
+
+    const version = await prisma.itineraryVersion.findFirst({
+      where: { id: versionId, itineraryId },
+    });
+
+    return version ?? null;
+  },
+
+  async restoreVersion(
+    itineraryId: string,
+    versionId: string,
+    userId: string,
+    role: string,
+    expectedVersion: number
+  ) {
+    return prisma.$transaction(async (tx) => {
+      const itinerary = await tx.itinerary.findUnique({
+        where: { id: itineraryId },
+        include: { collaborators: true },
+      });
+
+      if (!itinerary) return null;
+
+      const isOwner = itinerary.userId === userId;
+      const isAdmin = role === UserRole.ADMIN;
+      if (!isOwner && !isAdmin) {
+        const err: any = new Error("ITINERARY_FORBIDDEN");
+        throw err;
+      }
+
+      const version = await tx.itineraryVersion.findFirst({
+        where: { id: versionId, itineraryId },
+      });
+
+      if (!version) return null;
+
+      const snapshot = version.snapshot as ItinerarySnapshot;
+
+      const result = await tx.itinerary.updateMany({
+        where: { id: itineraryId, version: expectedVersion },
+        data: {
+          title: snapshot.title ?? null,
+          destination: snapshot.destination,
+          startDate: snapshot.startDate ? new Date(snapshot.startDate) : null,
+          endDate: snapshot.endDate ? new Date(snapshot.endDate) : null,
+          travelers: snapshot.travelers,
+          estimatedCost: snapshot.estimatedCost as unknown as Prisma.Decimal | null,
+          type: snapshot.type,
+          status: snapshot.status,
+          tourType: snapshot.tourType,
+          version: { increment: 1 },
+        },
+      });
+
+      if (result.count === 0) {
+        const err: any = new Error("ITINERARY_VERSION_CONFLICT");
+        throw err;
+      }
+
+      await tx.itineraryDay.deleteMany({ where: { itineraryId } });
+
+      for (const day of snapshot.days) {
+        const createdDay = await tx.itineraryDay.create({
+          data: {
+            itineraryId,
+            dayNumber: day.dayNumber,
+            title: day.title ?? undefined,
+            date: day.date ? new Date(day.date) : undefined,
+          },
+        });
+
+        if (day.activities?.length) {
+          for (const activity of day.activities) {
+            await tx.activity.create({
+              data: {
+                itineraryDayId: createdDay.id,
+                time: activity.time,
+                title: activity.title,
+                description: activity.description ?? undefined,
+                location: activity.location ?? undefined,
+                icon: activity.icon ?? undefined,
+                order: activity.order,
+              },
+            });
+          }
+        }
+      }
+
+      const restored = await tx.itinerary.findUnique({
+        where: { id: itineraryId },
+        include: itineraryIncludes,
+      });
+
+      if (!restored) return null;
+
+      await tx.itineraryVersion.create({
+        data: {
+          itineraryId,
+          version: restored.version,
+          snapshot: buildSnapshot({ ...restored, days: restored.days }),
+          createdById: userId,
+        },
+      });
+
+      await logAudit(tx, {
+        actorUserId: userId,
+        action: "ITINERARY_RESTORED",
+        entityType: "ITINERARY",
+        entityId: itineraryId,
+        metadata: { restoredFromVersion: version.version },
+        message: `Restored itinerary ${itineraryId} from version ${version.version}`,
+      });
+
+      return serializeItinerary(restored);
+    });
   },
 };

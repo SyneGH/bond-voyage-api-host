@@ -42,6 +42,7 @@ export interface ItineraryDTO {
   estimatedCost?: number | null;
   type: ItineraryType;
   status: ItineraryStatus;
+  version: number;
   tourType: TourType;
   sentStatus?: string | null;
   requestedStatus?: RequestStatus;

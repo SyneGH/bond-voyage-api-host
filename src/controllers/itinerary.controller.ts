@@ -7,6 +7,8 @@ import {
   createItineraryDto,
   itineraryIdParamDto,
   itineraryListQueryDto,
+  itineraryVersionParamDto,
+  restoreItineraryDto,
   updateItineraryDtoV2,
 } from "@/validators/itinerary.dto";
 import { AppError, createResponse, throwError } from "@/utils/responseHandler";
@@ -92,6 +94,9 @@ export const ItineraryController = {
       }
       if (error?.message === "ITINERARY_FORBIDDEN") {
         throwError(HTTP_STATUS.FORBIDDEN, "Forbidden");
+      }
+      if (error?.message === "ITINERARY_VERSION_CONFLICT") {
+        throwError(HTTP_STATUS.CONFLICT, "Itinerary version conflict");
       }
       if (error instanceof AppError) {
         throw error;
@@ -233,6 +238,104 @@ export const ItineraryController = {
       }
       if (error?.message === "ITINERARY_FORBIDDEN") {
         throwError(HTTP_STATUS.FORBIDDEN, "Forbidden");
+      }
+      if (error instanceof AppError) {
+        throw error;
+      }
+      throwError(HTTP_STATUS.INTERNAL_SERVER_ERROR, "Internal Server Error", error);
+    }
+  },
+
+  listVersions: async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const { id } = itineraryIdParamDto.parse(req.params);
+      const authUser = requireAuthUser(req);
+
+      const versions = await ItineraryService.listVersions(id, authUser.userId);
+
+      if (!versions) {
+        throwError(HTTP_STATUS.NOT_FOUND, "Itinerary not found");
+      }
+
+      createResponse(res, HTTP_STATUS.OK, "Itinerary versions retrieved", versions);
+    } catch (error: any) {
+      if (error instanceof ZodError) {
+        throwError(HTTP_STATUS.BAD_REQUEST, "Validation failed", error.errors);
+      }
+      if (error?.message === "ITINERARY_FORBIDDEN") {
+        throwError(HTTP_STATUS.FORBIDDEN, "Forbidden");
+      }
+      if (error instanceof AppError) {
+        throw error;
+      }
+      throwError(HTTP_STATUS.INTERNAL_SERVER_ERROR, "Internal Server Error", error);
+    }
+  },
+
+  getVersionDetail: async (
+    req: AuthenticatedRequest,
+    res: Response
+  ): Promise<void> => {
+    try {
+      const { id, versionId } = itineraryIdParamDto
+        .merge(itineraryVersionParamDto)
+        .parse({ ...req.params });
+      const authUser = requireAuthUser(req);
+
+      const version = await ItineraryService.getVersionDetail(id, versionId, authUser.userId);
+
+      if (!version) {
+        throwError(HTTP_STATUS.NOT_FOUND, "Itinerary version not found");
+      }
+
+      createResponse(res, HTTP_STATUS.OK, "Itinerary version retrieved", version);
+    } catch (error: any) {
+      if (error instanceof ZodError) {
+        throwError(HTTP_STATUS.BAD_REQUEST, "Validation failed", error.errors);
+      }
+      if (error?.message === "ITINERARY_FORBIDDEN") {
+        throwError(HTTP_STATUS.FORBIDDEN, "Forbidden");
+      }
+      if (error instanceof AppError) {
+        throw error;
+      }
+      throwError(HTTP_STATUS.INTERNAL_SERVER_ERROR, "Internal Server Error", error);
+    }
+  },
+
+  restoreVersion: async (
+    req: AuthenticatedRequest,
+    res: Response
+  ): Promise<void> => {
+    try {
+      const { id, versionId } = itineraryIdParamDto
+        .merge(itineraryVersionParamDto)
+        .parse({ ...req.params });
+      const payload = restoreItineraryDto.parse(req.body);
+      const authUser = requireAuthUser(req);
+
+      const restored = await ItineraryService.restoreVersion(
+        id,
+        versionId,
+        authUser.userId,
+        authUser.role,
+        payload.version
+      );
+
+      if (!restored) {
+        throwError(HTTP_STATUS.NOT_FOUND, "Itinerary version not found");
+      }
+
+      createResponse(res, HTTP_STATUS.OK, "Itinerary restored", restored);
+    } catch (error: any) {
+      if (error instanceof ZodError) {
+        throwError(HTTP_STATUS.BAD_REQUEST, "Validation failed", error.errors);
+      }
+      if (error?.message === "ITINERARY_FORBIDDEN") {
+        throwError(HTTP_STATUS.FORBIDDEN, "Forbidden");
+      }
+      if (error?.message === "ITINERARY_VERSION_CONFLICT") {
+        throwError(HTTP_STATUS.CONFLICT, "Itinerary version conflict");
       }
       if (error instanceof AppError) {
         throw error;

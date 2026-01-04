@@ -779,3 +779,88 @@ Authorization: Bearer {{accessToken}}
 # Expected: 200 OK (Should NOT include 'Date Tester')
 GET {{baseUrl}}/users?startDate=2026-01-03&endDate=2026-01-03
 Authorization: Bearer {{accessToken}}
+### ======================================================
+### 14. ITINERARY VERSIONING (requires authenticated user)
+### ======================================================
+# Create itinerary (captures version 1 and history)
+# @name createItinerary
+POST {{baseUrl}}/itineraries
+Authorization: Bearer {{userToken}}
+Content-Type: application/json
+
+{
+  "destination": "Cebu",
+  "startDate": "2025-06-01",
+  "endDate": "2025-06-05",
+  "travelers": 2,
+  "days": [
+    {
+      "dayNumber": 1,
+      "activities": [
+        { "time": "09:00", "title": "Arrive", "order": 0 },
+        { "time": "14:00", "title": "Beach walk", "order": 1 }
+      ]
+    }
+  ]
+}
+
+@itineraryId = {{createItinerary.response.body.data.id}}
+@itineraryVersion = {{createItinerary.response.body.data.version}}
+
+# Update itinerary with optimistic concurrency (expect 200)
+PATCH {{baseUrl}}/itineraries/{{itineraryId}}
+Authorization: Bearer {{userToken}}
+Content-Type: application/json
+
+{
+  "destination": "Cebu City",
+  "travelers": 3,
+  "version": {{itineraryVersion}},
+  "days": [
+    {
+      "dayNumber": 1,
+      "activities": [
+        { "time": "09:30", "title": "Brunch", "order": 0 },
+        { "time": "13:00", "title": "Museum", "order": 1 }
+      ]
+    }
+  ]
+}
+
+# Simulate conflict with stale version (expect 409)
+PATCH {{baseUrl}}/itineraries/{{itineraryId}}
+Authorization: Bearer {{userToken}}
+Content-Type: application/json
+
+{
+  "destination": "Cebu - stale",
+  "travelers": 4,
+  "version": 1,
+  "days": [
+    {
+      "dayNumber": 1,
+      "activities": [
+        { "time": "11:00", "title": "Old brunch", "order": 0 }
+      ]
+    }
+  ]
+}
+
+# List itinerary versions (metadata only)
+GET {{baseUrl}}/itineraries/{{itineraryId}}/versions
+Authorization: Bearer {{userToken}}
+
+@itineraryVersionId = REPLACE_WITH_VERSION_ID
+
+# Retrieve a specific version snapshot (owner/collaborator)
+GET {{baseUrl}}/itineraries/{{itineraryId}}/versions/{{itineraryVersionId}}
+Authorization: Bearer {{userToken}}
+
+# Restore a specific version (owner/admin only) with OCC
+POST {{baseUrl}}/itineraries/{{itineraryId}}/versions/{{itineraryVersionId}}/restore
+Authorization: Bearer {{userToken}}
+Content-Type: application/json
+
+{
+  "version": {{itineraryVersion}}
+}
