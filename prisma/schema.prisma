@@ -287,9 +287,9 @@ model Booking {
   travelers   Int?      @default(1)
 
   // Customer Data (captured from the Standard Itinerary modal)
-  customerName   String
-  customerEmail  String
-  customerMobile String
+  customerName   String?  // Optional for CUSTOMIZED/REQUESTED bookings
+  customerEmail  String?  // Only used for STANDARD bookings
+  customerMobile String?  // Only collected in Standard Itinerary modal
   bookedDate     DateTime @default(now())
 
   totalPrice Decimal @db.Decimal(10, 2)

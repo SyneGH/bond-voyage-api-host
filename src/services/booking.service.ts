@@ -250,14 +250,15 @@ export const BookingService = {
 
       const bookingCode = await generateBookingCode(tx);
 
+      // ✅ CORRECT FIX: Use undefined fallback to match Prisma's optional fields
       const booking = await tx.booking.create({
         data: {
           bookingCode,
           userId: data.userId,
           itineraryId: itinerary.id,
           destination: itinerary.destination,
-          startDate: itinerary.startDate ?? undefined,
-          endDate: itinerary.endDate ?? undefined,
+          startDate: itinerary.startDate ?? undefined,  // ✅ undefined for optional Date
+          endDate: itinerary.endDate ?? undefined,      // ✅ undefined for optional Date
           travelers: itinerary.travelers,
 
           totalPrice: data.totalPrice as unknown as Prisma.Decimal,
@@ -265,9 +266,10 @@ export const BookingService = {
           tourType: data.tourType ?? itinerary.tourType ?? TourType.PRIVATE,
           status: BookingStatus.DRAFT,
 
-          customerName: data.customerName,
-          customerEmail: data.customerEmail,
-          customerMobile: data.customerMobile,
+          // ✅ FIX: Use undefined fallback (not null)
+          customerName: data.customerName ?? undefined,
+          customerEmail: data.customerEmail ?? undefined,
+          customerMobile: data.customerMobile ?? undefined,
         },
         include: {
           itinerary: {
