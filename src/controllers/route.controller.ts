@@ -11,7 +11,7 @@ export const RouteController = {
   optimize: async (req: Request, res: Response): Promise<void> => {
     try {
       const payload = optimizeRouteDto.parse(req.body);
-      const activities = payload.activities;
+      let activities = payload.activities; // Mutable copy
       const mode = payload.mode ?? "drive";
 
       if (activities.length > MAX_MATRIX_POINTS) {
@@ -21,7 +21,35 @@ export const RouteController = {
         );
       }
 
-      const matrix = await GeoapifyService.routeMatrix(activities, mode);
+      // --- NEW: RESOLVE MISSING COORDINATES ---
+      // We map over activities async to fetch coords for any that are missing them
+      activities = await Promise.all(
+        activities.map(async (activity) => {
+          // If we already have coordinates, use them
+          if (typeof activity.lat === "number" && typeof activity.lng === "number") {
+            return { ...activity, lat: activity.lat, lng: activity.lng };
+          }
+          
+          // Otherwise, resolve the location string
+          if (activity.location) {
+             const coords = await GeoapifyService.getCoordinates(activity.location);
+             return { ...activity, lat: coords.lat, lng: coords.lng };
+          }
+
+          // Should be caught by Zod, but safe fallback
+          throwError(HTTP_STATUS.BAD_REQUEST, `Invalid activity data for ID: ${activity.id}`);
+          return activity as any; 
+        })
+      );
+      // ----------------------------------------
+
+      // Now 'activities' is guaranteed to have lat/lng. 
+      // We pass this "hydrated" array to the matrix service.
+      
+      // Cast to ensure type safety for the service call
+      const coordsOnly = activities.map(a => ({ lat: a.lat!, lng: a.lng! }));
+
+      const matrix = await GeoapifyService.routeMatrix(coordsOnly, mode);
       const order = buildNearestNeighborOrder(matrix.times);
       const optimizedActivities = order.map((index) => activities[index]);
 
@@ -31,8 +59,11 @@ export const RouteController = {
         matrix.times
       );
 
+      // Recalculate route geometry using the optimized order
+      const optimizedCoords = optimizedActivities.map(a => ({ lat: a.lat!, lng: a.lng! }));
+      
       const routingResponse = await GeoapifyService.route(
-        optimizedActivities,
+        optimizedCoords,
         mode
       );
 
@@ -57,13 +88,15 @@ export const RouteController = {
           : totalsFromMatrix.totalTime;
 
       createResponse(res, HTTP_STATUS.OK, "Route optimized", {
-        activities: optimizedActivities,
+        optimizedActivities,
         routeGeometry,
-        totalDistance,
-        totalTime,
+        totalDistance: typeof routeProps?.distance === "number" ? routeProps.distance : totalsFromMatrix.totalDistance,
+        totalTime: typeof routeProps?.time === "number" ? routeProps.time : totalsFromMatrix.totalTime,
         matrixSummary: totalsFromMatrix,
       });
+
     } catch (error) {
+      // ... (Keep existing Error Handling)
       if (error instanceof ZodError) {
         throwError(HTTP_STATUS.BAD_REQUEST, "Validation failed", error.errors);
       }

@@ -199,25 +199,30 @@ GET {{baseUrl}}/users?page=1&limit=10
 Authorization: Bearer {{accessToken}}
 
 ### ======================================================
-### 9. PLACES (AUTOCOMPLETE)
+### 18. SCENARIO: AUTOCOMPLETE TO OPTIMIZATION FLOW
 ### ======================================================
-### Search approved locations only
-# Expected: 200 OK (bondvoyage results)
-GET {{baseUrl}}/places/search?text=santa rosa
 
-### Search with Geoapify fallback
-# Expected: 200 OK (bondvoyage + geoapify results)
-GET {{baseUrl}}/places/search?text=palawan&allowExternal=true
-
-### Search validation error
-# Expected: 400 Bad Request
-GET {{baseUrl}}/places/search
-
-### ======================================================
-### 10. ROUTES (OPTIMIZE)
-### ======================================================
-### Optimize route (requires auth, Geoapify)
+### Step 1: Search for Start Point (Intramuros)
+# We use @name to capture the response into a variable called 'searchOrigin'
 # Expected: 200 OK
+# @name searchOrigin
+GET {{baseUrl}}/places/search?text=Intramuros&allowExternal=true
+
+### Step 2: Search for a Middle Activity (Rizal Park)
+# We capture this response as 'searchStop'
+# Expected: 200 OK
+# @name searchStop
+GET {{baseUrl}}/places/search?text=Rizal Park&allowExternal=true
+
+### Step 3: Search for Destination (Mall of Asia)
+# We capture this response as 'searchDest'
+# Expected: 200 OK
+# @name searchDest
+GET {{baseUrl}}/places/search?text=Mall of Asia&allowExternal=true
+
+### Step 4: Optimize Route using Selected Locations
+# We dynamically inject the lat/lng from the first result (index 0) of the previous searches.
+# Expected: 200 OK with "optimizedActivities" and "routeGeometry"
 POST {{baseUrl}}/routes/optimize
 Content-Type: application/json
 Authorization: Bearer {{userToken}}
@@ -225,21 +230,25 @@ Authorization: Bearer {{userToken}}
 {
   "mode": "drive",
   "activities": [
-    { "id": "a1", "lat": 14.5995, "lng": 120.9842 },
-    { "id": "a2", "lat": 14.5547, "lng": 121.0244 },
-    { "id": "a3", "lat": 14.676, "lng": 121.0437 }
+    {
+      "id": "activity-start",
+      "name": "Start: {{searchOrigin.response.body.data[0].name}}",
+      "lat": {{searchOrigin.response.body.data[0].lat}},
+      "lng": {{searchOrigin.response.body.data[0].lng}}
+    },
+    {
+      "id": "activity-middle",
+      "name": "Stop: {{searchStop.response.body.data[0].name}}",
+      "lat": {{searchStop.response.body.data[0].lat}},
+      "lng": {{searchStop.response.body.data[0].lng}}
+    },
+    {
+      "id": "activity-end",
+      "name": "End: {{searchDest.response.body.data[0].name}}",
+      "lat": {{searchDest.response.body.data[0].lat}},
+      "lng": {{searchDest.response.body.data[0].lng}}
+    }
   ]
-}
-
-### Optimize route invalid payload
-# Expected: 400 Bad Request
-POST {{baseUrl}}/routes/optimize
-Content-Type: application/json
-Authorization: Bearer {{userToken}}
-
-{
-  "mode": "drive",
-  "activities": []
 }
 
 ### Get user (admin)

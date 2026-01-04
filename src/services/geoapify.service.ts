@@ -41,7 +41,8 @@ export class GeoapifyService {
 
   static async autocomplete(text: string, limit = 3): Promise<unknown[]> {
     const apiKey = this.getApiKey();
-    const cacheKey = `autocomplete:${text}:${limit}`;
+    // Optional: Add filter to cache key if you plan to make it dynamic later
+    const cacheKey = `autocomplete:ph:${text}:${limit}`; 
     const cached = this.autocompleteCache.get(cacheKey);
     if (cached) {
       return cached;
@@ -52,6 +53,8 @@ export class GeoapifyService {
         text,
         limit,
         apiKey,
+        // Restrict results to Philippines (ISO 3166-1 alpha-2 code 'ph')
+        filter: "countrycode:ph", 
       },
     });
 
@@ -61,6 +64,22 @@ export class GeoapifyService {
 
     this.autocompleteCache.set(cacheKey, features, AUTOCOMPLETE_TTL_MS);
     return features;
+  }
+
+  static async getCoordinates(locationName: string): Promise<Coordinate> {
+    // Reuse the existing autocomplete method
+    const results = await this.autocomplete(locationName, 1);
+    
+    const feature = results[0] as any;
+    
+    if (!feature || !feature.properties || typeof feature.properties.lat !== 'number') {
+       throwError(HTTP_STATUS.BAD_REQUEST, `Could not resolve location: ${locationName}`);
+    }
+
+    return {
+      lat: feature.properties.lat,
+      lng: feature.properties.lon // Geoapify returns 'lon', we map to 'lng'
+    };
   }
 
   static async routeMatrix(
