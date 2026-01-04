@@ -11,10 +11,17 @@ export const ActivityLogController = {
     try {
       const { page, limit, actorId, type, action, entityType, entityId, dateFrom, dateTo } =
         activityLogListQueryDto.parse(req.query);
+
+        // SECURITY: Force actorId to be the current user if they are not an ADMIN
+      let effectiveActorId = actorId;
+      if (req.user?.role !== Role.ADMIN) {
+         effectiveActorId = req.user?.userId;
+      }
+
       const result = await ActivityLogService.list({
         page,
         limit,
-        actorId,
+        actorId: effectiveActorId,
         action: action ?? type,
         entityType,
         entityId,

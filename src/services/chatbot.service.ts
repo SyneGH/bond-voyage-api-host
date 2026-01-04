@@ -15,7 +15,7 @@ type GeminiContent = {
   candidates?: { content?: { parts?: { text?: string }[] } }[];
 };
 
-const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-1.5-flash";
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash-lite-preview-09-2025";
 
 function requireGeminiKey() {
   const apiKey = process.env.GEMINI_API_KEY;
