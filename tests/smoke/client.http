@@ -779,10 +779,12 @@ Authorization: Bearer {{accessToken}}
 # Expected: 200 OK (Should NOT include 'Date Tester')
 GET {{baseUrl}}/users?startDate=2026-01-03&endDate=2026-01-03
 Authorization: Bearer {{accessToken}}
+
 ### ======================================================
 ### 14. ITINERARY VERSIONING (requires authenticated user)
 ### ======================================================
-# Create itinerary (captures version 1 and history)
+
+### Create itinerary (captures version 1 and history)
 # @name createItinerary
 POST {{baseUrl}}/itineraries
 Authorization: Bearer {{userToken}}
@@ -804,10 +806,12 @@ Content-Type: application/json
   ]
 }
 
+### Extract variables from response
 @itineraryId = {{createItinerary.response.body.data.id}}
 @itineraryVersion = {{createItinerary.response.body.data.version}}
 
-# Update itinerary with optimistic concurrency (expect 200)
+### Update itinerary with optimistic concurrency (expect 200)
+# @name updateItinerary
 PATCH {{baseUrl}}/itineraries/{{itineraryId}}
 Authorization: Bearer {{userToken}}
 Content-Type: application/json
@@ -827,7 +831,10 @@ Content-Type: application/json
   ]
 }
 
-# Simulate conflict with stale version (expect 409)
+### Extract updated version
+@updatedVersion = {{updateItinerary.response.body.data.version}}
+
+### Simulate conflict with stale version (expect 409)
 PATCH {{baseUrl}}/itineraries/{{itineraryId}}
 Authorization: Bearer {{userToken}}
 Content-Type: application/json
@@ -846,21 +853,23 @@ Content-Type: application/json
   ]
 }
 
-# List itinerary versions (metadata only)
+### List itinerary versions (metadata only)
+# @name listVersions
 GET {{baseUrl}}/itineraries/{{itineraryId}}/versions
 Authorization: Bearer {{userToken}}
 
-@itineraryVersionId = REPLACE_WITH_VERSION_ID
+### Extract first version ID from list
+@firstVersionId = {{listVersions.response.body.data[0].id}}
 
-# Retrieve a specific version snapshot (owner/collaborator)
-GET {{baseUrl}}/itineraries/{{itineraryId}}/versions/{{itineraryVersionId}}
+### Retrieve a specific version snapshot (owner/collaborator)
+GET {{baseUrl}}/itineraries/{{itineraryId}}/versions/{{firstVersionId}}
 Authorization: Bearer {{userToken}}
 
-# Restore a specific version (owner/admin only) with OCC
-POST {{baseUrl}}/itineraries/{{itineraryId}}/versions/{{itineraryVersionId}}/restore
+### Restore a specific version (owner/admin only) with OCC
+POST {{baseUrl}}/itineraries/{{itineraryId}}/versions/{{firstVersionId}}/restore
 Authorization: Bearer {{userToken}}
 Content-Type: application/json
 
 {
-  "version": {{itineraryVersion}}
+  "version": {{updatedVersion}}
 }

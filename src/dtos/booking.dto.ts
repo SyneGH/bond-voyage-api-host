@@ -21,9 +21,9 @@ export interface BookingDTO {
   rejectionReason?: string | null;
   rejectionResolution?: string | null;
   isResolved?: boolean;
-  customerName?: string | null;
-  customerEmail?: string | null;
-  customerMobile?: string | null;
+  customerName: string;
+  customerEmail: string;
+  customerMobile: string;
   bookedDate?: string | null;
   createdAt?: string | null;
   updatedAt?: string | null;

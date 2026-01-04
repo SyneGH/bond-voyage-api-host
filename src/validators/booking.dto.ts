@@ -75,9 +75,9 @@ const inlineItineraryDto = z
 
 export const createBookingDto = z
   .object({
-    customerName: z.string().optional(),
-    customerEmail: z.string().email().optional(),
-    customerMobile: z.string().optional(),
+    customerName: z.string().min(1, "Customer name is required"),
+    customerEmail: z.string().email("Invalid email address"),
+    customerMobile: z.string().min(1, "Customer mobile number is required"),
     
     itineraryId: z.string().uuid().optional(),
     itinerary: inlineItineraryDto.optional(),

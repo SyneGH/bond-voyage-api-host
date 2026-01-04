@@ -4,7 +4,7 @@ import { ActivityLogService } from "@/services/activity-log.service";
 import { AuthenticatedRequest } from "@/types";
 import { activityLogListQueryDto } from "@/validators/activity-log.dto";
 import { AppError, createResponse, throwError } from "@/utils/responseHandler";
-import { HTTP_STATUS } from "@/constants/constants";
+import { HTTP_STATUS, Role } from "@/constants/constants";
 
 export const ActivityLogController = {
   list: async (req: AuthenticatedRequest, res: Response): Promise<void> => {
