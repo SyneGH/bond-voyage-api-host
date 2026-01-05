@@ -63,6 +63,7 @@ _Auth required unless noted; all responses wrapped in the standard envelope. Pag
 - **DELETE /itineraries/:id** — Archive/delete.
 - **PATCH /itineraries/:id/send** — Mark sent to customer.
 - **PATCH /itineraries/:id/confirm** — Owner confirm.
+- **GET /itineraries/:id/versions** | **GET /itineraries/:id/versions/:versionId** | **POST /itineraries/:id/versions/:versionId/restore** — Version history and restore.
 - **POST /itineraries/:id/collaborators** — Add collaborator `{ userId }`.
 - **GET /itineraries/:id/collaborators** — List collaborators.
 - **DELETE /itineraries/:id/collaborators/:userId** — Remove collaborator.
@@ -97,6 +98,7 @@ _Auth required unless noted; all responses wrapped in the standard envelope. Pag
 ### AI Chatbots
 - **POST /chatbots/roameo** — Body `{ question }`; answers only from FAQ DB (no internet; returns strict in-scope responses).
 - **POST /chatbots/roaman** — Body `{ prompt, preferences? }`; responds with friendly text plus JSON draft itinerary (type `SMART_TRIP`), no DB writes.
+- **POST /ai/itinerary** — Body `{ destination, startDate, endDate, travelers, budget, travelPace, preferences?[] }`; deterministic smart-trip builder (no Gemini required).
 
 ### Audits
 - **GET /activity-logs** — Admin-wide audit query with filters (`actorId`, `action` substring match, `entityType`, `entityId`, `dateFrom`, `dateTo`).
@@ -105,7 +107,14 @@ _Auth required unless noted; all responses wrapped in the standard envelope. Pag
 - _Action filter note:_ Substring matching means legacy strings like "Created Booking" will not match enum constants such as "BOOKING_CREATED" unless stored consistently; this is expected for Phase I.
 
 ### Other Supporting Endpoints
-- Weather (`/weather`), route/places search (`/routes`, `/places`), inquiries/feedback uploads, FAQ CRUD (`/faqs`), uploads (`/upload`), dashboard stats (`/dashboard`), AI (`/ai`) remain as implemented in previous phases; no schema changes here.
+- **Weather:** `GET /weather` (current) and `GET /weather/forecast` (5-step forecast), public; uses OpenWeather if key present, mock otherwise.
+- **Routes:** `POST /routes/calculate` and `POST /routes/optimize`, require auth; Geoapify-backed when key configured.
+- **Places:** `GET /places/search` public Geoapify-powered lookup.
+- **Inquiries:** `GET /inquiries`, `POST /inquiries`, `POST /inquiries/:id/messages` (auth required) for threaded booking questions.
+- **Feedback:** `POST /feedback` (auth), `GET /feedback` and `PATCH /feedback/:id/respond` (admin).
+- **Tour packages:** `GET /tour-packages`/`:id` public; admin create/update/delete.
+- **Dashboard:** `GET /dashboard/stats` admin-only snapshot.
+- **Uploads:** `POST /upload/itinerary-thumbnail` placeholder URL responder (no storage).
 
 #### Minimal Request/Response Shapes (examples)
 - Success envelope: `{ "success": true, "message": "...", "data": { ... }, "meta": { ... } }`

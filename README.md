@@ -121,35 +121,187 @@ npm run db:studio    # Open Prisma Studio
 npm run db:seed      # Seed database with initial data
 ```
 
-## 📡 API Endpoints
+## 📡 API Endpoints (Complete)
 
-### Authentication Routes (`/api/v1/auth`)
+All routes are prefixed with `/api/v1`. Unless noted as Public, endpoints require authentication; "Admin" requires the admin role.
 
-| Method | Endpoint         | Description             | Access  |
-| ------ | ---------------- | ----------------------- | ------- |
-| POST   | `/register`      | Register new user       | Public  |
-| POST   | `/login`         | User login              | Public  |
-| POST   | `/auth/refresh-token` | Refresh access token    | Public  |
-| POST   | `/logout`        | Logout user             | Private |
-| POST   | `/logout-all`    | Logout from all devices | Private |
-| GET    | `/profile`       | Get user profile        | Private |
+### Authentication & OTP (`/auth`)
 
-### User Routes (`/api/v1/users`)
+| Method | Endpoint | Description | Access |
+| --- | --- | --- | --- |
+| POST | `/auth/register` | Register a new user account. | Public |
+| POST | `/auth/login` | Authenticate with email/password; returns tokens. | Public |
+| POST | `/auth/refresh-token` | Refresh access token using refresh token. | Public |
+| POST | `/auth/reset-password` | Begin password reset flow. | Public |
+| POST | `/auth/send-otp` | Send OTP (e.g., for verification/reset). | Public |
+| POST | `/auth/verify-otp` | Verify a submitted OTP. | Public |
+| POST | `/auth/logout` | Log out current session. | Private |
+| POST | `/auth/logout-all` | Invalidate all sessions for the user. | Private |
+| GET | `/auth/profile` | Retrieve the authenticated user profile. | Private |
 
-| Method | Endpoint           | Description               | Access  |
-| ------ | ------------------ | ------------------------- | ------- |
-| GET    | `/`                | Get all users (paginated) | Admin   |
-| GET    | `/:id`             | Get user by ID            | Admin   |
-| PUT    | `/profile`         | Update own profile        | Private |
-| PUT    | `/change-password` | Change password           | Private |
-| PATCH  | `/:id/deactivate`  | Deactivate user           | Admin   |
-| DELETE | `/:id`             | Delete user               | Admin   |
+### Users (`/users`)
 
-### Health Check (`/api/v1/health`)
+| Method | Endpoint | Description | Access |
+| --- | --- | --- | --- |
+| PATCH | `/users/profile` | Update own profile. | Private |
+| PUT | `/users/change-password` | Change own password. | Private |
+| GET | `/users/me/stats` | View personal stats. | Private |
+| GET | `/users/me/activity-logs` | View own activity logs. | Private |
+| POST | `/users` | Create a user. | Admin |
+| GET | `/users` | List users (pagination supported). | Admin |
+| GET | `/users/:id` | Retrieve a user by ID. | Admin |
+| PATCH | `/users/:id` | Update a user. | Admin |
+| PATCH | `/users/:id/deactivate` | Deactivate a user. | Admin |
+| DELETE | `/users/:id` | Delete a user. | Admin |
 
-| Method | Endpoint  | Description       | Access |
-| ------ | --------- | ----------------- | ------ |
-| GET    | `/health` | API health status | Public |
+### Itineraries & Collaboration (`/itineraries`)
+
+| Method | Endpoint | Description | Access |
+| --- | --- | --- | --- |
+| POST | `/itineraries` | Create an itinerary. | Private |
+| GET | `/itineraries` | List itineraries owned by the user. | Private |
+| GET | `/itineraries/:id` | Get itinerary details. | Private |
+| PATCH | `/itineraries/:id` | Update an itinerary. | Private |
+| DELETE | `/itineraries/:id` | Delete an itinerary. | Private |
+| PATCH | `/itineraries/:id/send` | Send itinerary for request/approval. | Private |
+| PATCH | `/itineraries/:id/confirm` | Confirm an itinerary. | Private |
+| GET | `/itineraries/:id/versions` | List saved versions. | Private |
+| GET | `/itineraries/:id/versions/:versionId` | View specific version details. | Private |
+| POST | `/itineraries/:id/versions/:versionId/restore` | Restore an itinerary version. | Private |
+| POST | `/itineraries/:id/collaborators` | Add a collaborator. | Private |
+| GET | `/itineraries/:id/collaborators` | List collaborators. | Private |
+| DELETE | `/itineraries/:id/collaborators/:userId` | Remove a collaborator. | Private |
+
+### Bookings & Collaboration (`/bookings`)
+
+| Method | Endpoint | Description | Access |
+| --- | --- | --- | --- |
+| GET | `/bookings/my-bookings` | List bookings owned by the user. | Private |
+| GET | `/bookings/shared-with-me` | List bookings shared with the user. | Private |
+| POST | `/bookings` | Create a booking. | Private |
+| PATCH | `/bookings/:id/submit` | Submit booking for processing. | Private |
+| PATCH | `/bookings/:id/cancel` | Cancel a booking. | Private |
+| PUT | `/bookings/:id` | Update booking itinerary details. | Private |
+| POST | `/bookings/:id/payments` | Add a payment proof for a booking. | Private |
+| GET | `/bookings/:id/payments` | List payments for a booking. | Private |
+| DELETE | `/bookings/:id` | Delete a draft booking. | Private |
+| GET | `/bookings/:id` | Get booking details. | Private/Admin (collaborator or owner) |
+| GET | `/bookings/admin/bookings` | Admin list of all bookings. | Admin |
+| PATCH | `/bookings/:id/status` | Admin update of booking status. | Admin |
+| POST | `/bookings/:id/collaborators` | Add a booking collaborator. | Private |
+| GET | `/bookings/:id/collaborators` | List booking collaborators. | Private |
+| DELETE | `/bookings/:id/collaborators/:collaboratorUserId` | Remove a booking collaborator. | Private |
+
+### Payments (`/payments`)
+
+| Method | Endpoint | Description | Access |
+| --- | --- | --- | --- |
+| GET | `/payments` | List payments (filtered by caller role). | Private |
+| POST | `/payments/:id` | Create a payment for a booking. | Private |
+| GET | `/payments/:id/proof` | Retrieve payment proof. | Private |
+| PATCH | `/payments/:id/status` | Update payment status. | Admin |
+
+### Tour Packages (`/tour-packages`)
+
+| Method | Endpoint | Description | Access |
+| --- | --- | --- | --- |
+| GET | `/tour-packages` | List tour packages. | Public |
+| GET | `/tour-packages/:id` | Get a tour package. | Public |
+| POST | `/tour-packages` | Create a tour package. | Admin |
+| PUT | `/tour-packages/:id` | Update a tour package. | Admin |
+| DELETE | `/tour-packages/:id` | Remove a tour package. | Admin |
+
+### Inquiries (`/inquiries`)
+
+| Method | Endpoint | Description | Access |
+| --- | --- | --- | --- |
+| GET | `/inquiries` | List inquiries. | Private |
+| POST | `/inquiries` | Submit an inquiry. | Private |
+| POST | `/inquiries/:id/messages` | Add a message to an inquiry. | Private |
+
+### Feedback (`/feedback`)
+
+| Method | Endpoint | Description | Access |
+| --- | --- | --- | --- |
+| POST | `/feedback` | Submit feedback. | Private |
+| GET | `/feedback` | List feedback. | Admin |
+| PATCH | `/feedback/:id/respond` | Respond to feedback. | Admin |
+
+### Activity & Audit Logs (`/activity-logs`, `/admin/audit-logs`)
+
+| Method | Endpoint | Description | Access |
+| --- | --- | --- | --- |
+| GET | `/activity-logs` | List activity logs. | User/Admin |
+| GET | `/activity-logs/:id` | View an activity log entry. | Admin |
+| GET | `/admin/audit-logs` | Alias for activity log list. | User/Admin |
+| GET | `/admin/audit-logs/:id` | Alias for activity log detail. | Admin |
+
+### Notifications (`/notifications`)
+
+| Method | Endpoint | Description | Access |
+| --- | --- | --- | --- |
+| GET | `/notifications` | List notifications. | Private |
+| PATCH | `/notifications/:id/read` | Mark a notification as read. | Private |
+| PATCH | `/notifications/read-all` | Mark all notifications as read. | Private |
+
+### Weather (`/weather`)
+
+| Method | Endpoint | Description | Access |
+| --- | --- | --- | --- |
+| GET | `/weather` | Current weather lookup. | Public |
+| GET | `/weather/forecast` | Weather forecast lookup. | Public |
+
+### Routes (Distance/Optimization) (`/routes`)
+
+| Method | Endpoint | Description | Access |
+| --- | --- | --- | --- |
+| POST | `/routes/calculate` | Calculate route details. | Private |
+| POST | `/routes/optimize` | Optimize a multi-stop route. | Private |
+
+### Places (`/places`)
+
+| Method | Endpoint | Description | Access |
+| --- | --- | --- | --- |
+| GET | `/places/search` | Search for places. | Public |
+
+### Chatbots & Smart Trip (`/chatbots`, `/ai`)
+
+| Method | Endpoint | Description | Access |
+| --- | --- | --- | --- |
+| POST | `/chatbots/roameo` | FAQ chatbot response (Roameo). | Public |
+| POST | `/chatbots/roaman` | Smart trip planner (Roaman). | Public |
+| POST | `/ai/itinerary` | AI-generated itinerary draft. | Public |
+
+### FAQs (`/faqs`)
+
+| Method | Endpoint | Description | Access |
+| --- | --- | --- | --- |
+| GET | `/faqs` | Public FAQ list/search. | Public |
+| POST | `/faqs` | Create FAQ entry. | Admin |
+| PUT | `/faqs/:id` | Update FAQ entry. | Admin |
+| DELETE | `/faqs/:id` | Delete FAQ entry. | Admin |
+
+### Dashboard (`/dashboard`)
+
+| Method | Endpoint | Description | Access |
+| --- | --- | --- | --- |
+| GET | `/dashboard/stats` | Admin analytics snapshot. | Admin |
+
+### Uploads (`/upload`)
+
+| Method | Endpoint | Description | Access |
+| --- | --- | --- | --- |
+| POST | `/upload/itinerary-thumbnail` | Upload itinerary thumbnail image. | Public |
+
+### Places & Weather Discovery (`/places`, `/weather`)
+
+- See dedicated sections above for search and forecast endpoints.
+
+### Health Check
+
+| Method | Endpoint | Description | Access |
+| --- | --- | --- | --- |
+| GET | `/health` | API health status. | Public |
 
 ## 📝 API Usage Examples
 
