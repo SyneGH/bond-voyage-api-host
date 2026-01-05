@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { smartTripItineraryDataDto, smartTripGenerateDto } from "@/validators/ai.dto";
 
 const parseNumber = (value: unknown, fallback: number) => {
   if (typeof value === "number") {
@@ -78,16 +79,62 @@ export const createBookingDto = z
     customerName: z.string().min(1, "Customer name is required"),
     customerEmail: z.string().email("Invalid email address"),
     customerMobile: z.string().min(1, "Customer mobile number is required"),
-    
+
     itineraryId: z.string().uuid().optional(),
     itinerary: inlineItineraryDto.optional(),
     totalPrice: z.number().min(0),
     type: z.enum(["STANDARD", "CUSTOMIZED", "REQUESTED"]).optional(),
     tourType: z.enum(["JOINER", "PRIVATE"]).optional(),
+
+    itineraryType: z
+      .enum(["STANDARD", "CUSTOMIZED", "REQUESTED", "SMART_TRIP"])
+      .optional(),
+    destination: z.string().min(1).max(100).optional(),
+    startDate: z.string().optional(),
+    endDate: z.string().optional(),
+    travelers: z.number().int().min(1).optional(),
+    budget: z.number().min(0).optional(),
+    travelPace: z.enum(["relaxed", "moderate", "packed", "own_pace"]).optional(),
+    preferences: z.array(z.string().min(1).max(40)).max(10).optional(),
+    itineraryData: smartTripItineraryDataDto.optional(),
   })
-  .refine((data) => data.itineraryId || data.itinerary, {
-    message: "itineraryId or itinerary is required",
-    path: ["itineraryId"],
+  .superRefine((data, ctx) => {
+    const hasLegacyItinerary = data.itineraryId || data.itinerary;
+    const isSmartTrip =
+      data.itineraryType === "SMART_TRIP" || data.itineraryData !== undefined;
+
+    if (!hasLegacyItinerary && !isSmartTrip) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "itineraryId or itinerary is required",
+        path: ["itineraryId"],
+      });
+      return;
+    }
+
+    if (!isSmartTrip) return;
+
+    const smartTripBase = smartTripGenerateDto.safeParse({
+      destination: data.destination,
+      startDate: data.startDate,
+      endDate: data.endDate,
+      travelers: data.travelers,
+      budget: data.budget,
+      travelPace: data.travelPace,
+      preferences: data.preferences,
+    });
+
+    if (!smartTripBase.success) {
+      smartTripBase.error.issues.forEach((issue) => ctx.addIssue(issue));
+    }
+
+    if (!data.itineraryData) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "itineraryData is required for SMART_TRIP",
+        path: ["itineraryData"],
+      });
+    }
   });
 
 export const updateItineraryDto = z
