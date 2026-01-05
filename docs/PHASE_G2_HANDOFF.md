@@ -50,5 +50,5 @@ curl http://localhost:8087/api/v1/faqs
 
 ## Limitations / TODOs
 - No embeddings/vector search; keyword match only for FAQ RAG.
-- No external storage for uploads (thumbnail stub returns provided/placeholder URL).
-- Notifications/structured payloads are deferred (Phase F skipped).
+- Gemini env is required; returns 501 without it.
+- Upload endpoint still returns placeholder URL; no storage backend.
