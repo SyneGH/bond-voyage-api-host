@@ -9,6 +9,7 @@ import {
 import { prisma } from "@/config/database";
 import { serializeItinerary, toISO } from "@/utils/serialize";
 import { logAudit } from "@/services/activity-log.service";
+import { serializeVersion } from "@/utils/serialize";
 
 interface UpsertItineraryInput {
   userId?: string;
@@ -479,18 +480,17 @@ export const ItineraryService = {
 
     const versions = await prisma.itineraryVersion.findMany({
       where: { itineraryId },
-      orderBy: { createdAt: "desc" },
+      include: {
+        createdBy: { select: { firstName: true, lastName: true } }
+      },
+      orderBy: { version: 'desc' }
     });
 
-    return versions.map((version) => ({
-      id: version.id,
-      version: version.version,
-      createdAt: version.createdAt,
-      createdById: version.createdById,
-    }));
+    return versions.map(serializeVersion);
   },
 
-  async getVersionDetail(itineraryId: string, versionId: string, viewerId: string) {
+  async getVersionDetail(itineraryId: string, versionId: string, userId: string) {
+    // 1. Check Permissions first
     const itinerary = await prisma.itinerary.findUnique({
       where: { id: itineraryId },
       include: { collaborators: true },
@@ -498,13 +498,31 @@ export const ItineraryService = {
 
     if (!itinerary) return null;
 
-    ensureCanViewItinerary(itinerary, viewerId);
+    const isOwner = itinerary.userId === userId;
+    const isCollaborator = itinerary.collaborators.some((c) => c.userId === userId);
 
-    const version = await prisma.itineraryVersion.findFirst({
-      where: { id: versionId, itineraryId },
+    if (!isOwner && !isCollaborator) {
+      const err: any = new Error("ITINERARY_FORBIDDEN");
+      throw err;
+    }
+
+    // 2. Fetch the specific version
+    const version = await prisma.itineraryVersion.findUnique({
+      where: { 
+        id: versionId,
+        itineraryId: itineraryId // Security check: ensure version belongs to itinerary
+      },
+      include: {
+        createdBy: {
+          select: { firstName: true, lastName: true }
+        }
+      }
     });
 
-    return version ?? null;
+    if (!version) return null;
+
+    // 3. Serialize (Rename columns for frontend)
+    return serializeVersion(version);
   },
 
   async restoreVersion(

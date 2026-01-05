@@ -73,7 +73,7 @@ export const collaboratorParamDto = z.object({
 });
 
 export const itineraryVersionParamDto = z.object({
-  versionId: z.string().uuid(),
+  versionId: z.string().uuid("Invalid version ID"),
 });
 
 export const restoreItineraryDto = z.object({

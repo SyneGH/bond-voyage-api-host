@@ -7,6 +7,7 @@ import {
   Activity,
   User,
   Notification,
+  ItineraryVersion
 } from "@prisma/client";
 import { BookingDTO } from "@/dtos/booking.dto";
 import { ItineraryDTO } from "@/dtos/itinerary.dto";
@@ -210,5 +211,42 @@ export const serializeNotification = (
     data: (notification.data as any) ?? null,
     isRead: notification.isRead,
     createdAt: formatDisplayDate(notification.createdAt) as string,
+  };
+};
+
+// Define the type expecting the relation included
+type ItineraryVersionWithUser = ItineraryVersion & {
+  createdBy: Pick<User, "firstName" | "lastName"> | null;
+};
+
+export const serializeVersion = (version: ItineraryVersionWithUser) => {
+  // 1. Handle the JSON snapshot
+  // Prisma usually returns this as an object. If it's a string, JSON.parse() it.
+  const snapshotData = version.snapshot as any;
+
+  return {
+    id: version.id,
+    
+    // MAP: createdAt -> timestamp
+    timestamp: new Date(version.createdAt).getTime(),
+    
+    // MAP: createdBy -> author
+    author: version.createdBy
+      ? `${version.createdBy.firstName} ${version.createdBy.lastName}`
+      : "Unknown User",
+
+    // MAP: snapshot -> bookingData & itineraryDays
+    // We default to the structure your frontend expects if fields are missing
+    bookingData: snapshotData.bookingData || {
+      destination: snapshotData.destination || "",
+      travelers: snapshotData.travelers || "1",
+      travelDateFrom: snapshotData.startDate || "",
+      travelDateTo: snapshotData.endDate || "",
+      totalAmount: snapshotData.estimatedCost || "0"
+    },
+    itineraryDays: snapshotData.days || [],
+    
+    // Optional label
+    label: `Version ${version.version}`
   };
 };
