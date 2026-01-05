@@ -2,26 +2,17 @@ import { Request, Response } from "express";
 import { ZodError } from "zod";
 import { AppError, createResponse, throwError } from "@/utils/responseHandler";
 import { HTTP_STATUS } from "@/constants/constants";
-import { smartTripGenerateDto } from "@/validators/ai.dto";
+// Ensure this matches the export name in ai.dto.ts
+import { aiItineraryDto } from "@/validators/ai.dto"; 
 import { AiService } from "@/services/ai.service";
 
 export const AiController = {
   generateItinerary: async (req: Request, res: Response): Promise<void> => {
     try {
-      const payload = smartTripGenerateDto.parse(req.body);
-      const itinerary = AiService.buildSmartTripItinerary(payload);
-      createResponse(res, HTTP_STATUS.OK, "Itinerary generated", {
-        itinerary,
-        metadata: {
-          destination: payload.destination,
-          startDate: payload.startDate,
-          endDate: payload.endDate,
-          travelers: payload.travelers,
-          budget: payload.budget,
-          travelPace: payload.travelPace,
-          preferences: payload.preferences ?? [],
-        },
-      });
+      const payload = aiItineraryDto.parse(req.body);
+      // Ensure we await the async service
+      const itinerary = await AiService.generateItinerary(payload);
+      createResponse(res, HTTP_STATUS.OK, "Itinerary generated", { itinerary });
     } catch (error) {
       if (error instanceof ZodError) {
         throwError(HTTP_STATUS.BAD_REQUEST, "Validation failed", error.errors);
@@ -29,6 +20,7 @@ export const AiController = {
       if (error instanceof AppError) {
         throw error;
       }
+      console.error(error);
       throwError(HTTP_STATUS.INTERNAL_SERVER_ERROR, "Itinerary generation failed", error);
     }
   },

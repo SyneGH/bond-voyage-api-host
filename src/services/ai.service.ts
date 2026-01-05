@@ -1,135 +1,140 @@
-import { SMART_TRIP_ICON_KEYS, SmartTripIconKey } from "@/constants/smartTrip";
-import { SmartTripRequest } from "@/validators/ai.dto";
+import { GoogleGenAI } from "@google/genai";
 
-const MS_PER_DAY = 24 * 60 * 60 * 1000;
+interface ItineraryInput {
+  destination: string;
+  startDate: Date;
+  endDate: Date;
+  travelers?: number;
+  budget?: number;
+  preferences?: string[];
+}
 
-const activityLibrary: Record<SmartTripIconKey, string[]> = {
-  sightseeing: [
-    "Explore the city's iconic landmarks",
-    "Join a guided walking tour of historic sites",
-    "Capture skyline views from a popular lookout",
-  ],
-  museum: [
-    "Visit the flagship museum for regional art",
-    "Discover a science or innovation center",
-    "Stop by a boutique gallery featuring local artists",
-  ],
-  food: [
-    "Sample street food at a bustling market",
-    "Book a chef-led tasting menu",
-    "Try a beloved neighborhood eatery",
-  ],
-  cafe: [
-    "Cozy up in a specialty coffee shop",
-    "Enjoy brunch at a local cafe",
-    "Try a dessert spot known to locals",
-  ],
-  nightlife: [
-    "Listen to live music at an intimate bar",
-    "Experience a rooftop lounge",
-    "Stroll through a vibrant nightlife district",
-  ],
-  shopping: [
-    "Browse artisan goods in a weekend market",
-    "Visit a design district for unique finds",
-    "Pick up souvenirs at a local craft store",
-  ],
-  nature: [
-    "Relax at a nearby park or botanical garden",
-    "Take a scenic ferry or riverside walk",
-    "Enjoy a lakeside picnic",
-  ],
-  beach: [
-    "Spend the afternoon on the shoreline",
-    "Try a coastal bike ride",
-    "Watch sunset from a beachside cafe",
-  ],
-  hiking: [
-    "Hike an accessible trail with viewpoints",
-    "Join a guided nature walk",
-    "Visit a waterfall or canyon lookout",
-  ],
-  relax: [
-    "Schedule downtime at a spa or sauna",
-    "Enjoy a slow morning near your stay",
-    "Take a leisurely neighborhood stroll",
-  ],
-  culture: [
-    "Attend a cultural performance or show",
-    "Explore a heritage district",
-    "Visit a local temple or cathedral",
-  ],
-  activity: [
-    "Book a hands-on workshop",
-    "Try a cooking or pottery class",
-    "Join a small-group experience",
-  ],
-};
-
-const travelPaceToActivities: Record<SmartTripRequest["travelPace"], number> = {
-  relaxed: 3,
-  moderate: 4,
-  packed: 5,
-  own_pace: 3,
-};
-
-const pickIconsForPreferences = (preferences: string[]): SmartTripIconKey[] => {
-  const prioritized: SmartTripIconKey[] = [];
-
-  for (const pref of preferences) {
-    const key = SMART_TRIP_ICON_KEYS.find((icon) => pref.toLowerCase().includes(icon));
-    if (key && !prioritized.includes(key)) {
-      prioritized.push(key);
-    }
-  }
-
-  return prioritized.length > 0
-    ? prioritized
-    : (["sightseeing", "food", "culture"] as SmartTripIconKey[]);
-};
-
-const buildActivity = (
-  iconKey: SmartTripIconKey,
-  title: string,
-  destination: string,
-  offset: number
-) => {
-  const timeSlots = ["08:00", "10:30", "13:00", "16:00", "19:00", "21:00"];
-  const time = timeSlots[offset % timeSlots.length];
-
-  return {
-    time,
-    title: title.replace("city", destination),
-    iconKey,
-    description: undefined as string | undefined,
-  };
+// 1. Schema Definition (Strict JSON Mode)
+const itinerarySchema = {
+  type: "OBJECT",
+  properties: {
+    days: {
+      type: "ARRAY",
+      items: {
+        type: "OBJECT",
+        properties: {
+          day: { type: "NUMBER" },
+          title: { type: "STRING" },
+          activities: {
+            type: "ARRAY",
+            items: { type: "STRING" },
+          },
+        },
+        required: ["day", "title", "activities"],
+      },
+    },
+  },
+  required: ["days"],
 };
 
 export const AiService = {
-  buildSmartTripItinerary(input: SmartTripRequest) {
-    const startDate = new Date(input.startDate);
-    const endDate = new Date(input.endDate);
+  async generateItinerary(input: ItineraryInput) {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      console.warn("GEMINI_API_KEY missing. Using fallback template.");
+      return this.buildFallbackItinerary(input);
+    }
+
+    const client = new GoogleGenAI({ apiKey });
+
+    // Calculate duration (inclusive of start/end dates)
+    const duration =
+      Math.ceil(
+        (new Date(input.endDate).getTime() - new Date(input.startDate).getTime()) /
+          (1000 * 60 * 60 * 24)
+      ) + 1;
+
+    // 2. Philippines-Only Prompt
+    const prompt = `
+      You are a local travel expert for the **Philippines**. 
+      Your task is to generate a travel itinerary strictly for locations within the Philippines.
+
+      **Request Details:**
+      - Destination: ${input.destination}
+      - Duration: ${duration} Days
+      - Travelers: ${input.travelers || 2}
+      - Preferences: ${input.preferences?.join(", ") || "General sightseeing, Local food"}
+
+      **Strict Constraints:**
+      1. **Geographic Lock:** If the destination "${input.destination}" is NOT in the Philippines, DO NOT generate a trip. Instead, return a single-day itinerary with the title "Location Unavailable" and one activity: "BondVoyage currently only specializes in Philippine destinations."
+      2. **Structure:** Provide exactly ${duration} days.
+      3. **Content Style:** - Titles should be short and catchy (e.g., "Island Hopping", "Historical Walk").
+         - Activities must be specific real-world locations or experiences in ${input.destination}.
+         - Keep a balanced pace (Morning, Afternoon, Evening).
+
+      Output must follow the provided JSON schema exactly.
+    `;
+
+    try {
+      const response = await client.models.generateContent({
+        model: "gemini-2.5-flash-lite",
+        contents: [
+          {
+            role: "user",
+            parts: [{ text: prompt }],
+          },
+        ],
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: itinerarySchema,
+        },
+      });
+
+      // 3. Handle Response
+      const responseText = response.text;
+      
+      if (!responseText) {
+        throw new Error("Empty response from AI");
+      }
+
+      const data = JSON.parse(responseText);
+
+      // 4. Post-process: Map AI days to Real Calendar Dates
+      return (data.days || []).map((day: any, index: number) => {
+        const dayDate = new Date(input.startDate);
+        dayDate.setDate(dayDate.getDate() + index);
+
+        return {
+          ...day,
+          day: index + 1, // Ensure day numbers are sequential 1..N
+          date: dayDate.toISOString().split("T")[0],
+        };
+      });
+
+    } catch (error) {
+      console.error("AI Generation Failed:", error);
+      // Fail gracefully to the old logic if AI is down or errors out
+      return this.buildFallbackItinerary(input);
+    }
+  },
+
+  // Fallback Logic (Original Template Rotator)
+  buildFallbackItinerary(input: ItineraryInput) {
+    const MS_PER_DAY = 24 * 60 * 60 * 1000;
     const totalDays =
-      Math.floor((endDate.getTime() - startDate.getTime()) / MS_PER_DAY) + 1;
+      Math.floor(
+        (new Date(input.endDate).getTime() - new Date(input.startDate).getTime()) /
+          MS_PER_DAY
+      ) + 1;
 
-    const preferredIcons = pickIconsForPreferences(input.preferences ?? []);
-    const activitiesPerDay = travelPaceToActivities[input.travelPace] ?? 3;
+    const templates = [
+      { title: "Arrival & Orientation", activities: ["Check-in to accommodation", "Relaxing neighborhood walk", "Welcome dinner at a local restaurant"] },
+      { title: "City Highlights", activities: ["Visit main historical landmarks", "Shopping at local markets", "Sunset view"] },
+      { title: "Nature & Culture", activities: ["Morning nature trek or beach visit", "Museum tour", "Free time for leisure"] },
+    ];
 
-    return Array.from({ length: totalDays }).map((_, index) => {
-      const iconRotation = preferredIcons[index % preferredIcons.length];
-      const library = activityLibrary[iconRotation];
-
-      const activityTitles = Array.from({ length: activitiesPerDay }).map(
-        (_, idx) => library[idx % library.length]
-      );
-
-      return {
-        day: index + 1,
-        title: `Day ${index + 1}: ${input.destination} highlights`,
-        activities: activityTitles.map((title, idx) =>
-          buildActivity(iconRotation, title, input.destination, idx)
-        ),
-      };
-    });
+    return Array.from({ length: totalDays }).map((_, index) => ({
+      day: index + 1,
+      date: new Date(new Date(input.startDate).getTime() + index * MS_PER_DAY)
+        .toISOString()
+        .split("T")[0],
+      title: `${input.destination}: ${templates[index % 3].title}`,
+      activities: templates[index % 3].activities,
+    }));
   },
 };

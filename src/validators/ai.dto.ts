@@ -83,6 +83,36 @@ export const smartTripItineraryDataDto = z
     }
   });
 
+// 1. Re-introduce the dateSchema helper
+const dateSchema = z.preprocess((value) => {
+  if (value instanceof Date) {
+    return value;
+  }
+  if (typeof value === "string" || typeof value === "number") {
+    return new Date(value);
+  }
+  return value;
+}, z.date());
+
+export const aiItineraryDto = z
+  .object({
+    destination: z.string().min(1),
+    startDate: dateSchema,
+    endDate: dateSchema,
+    travelers: z.number().optional(),
+    budget: z.number().optional(),
+    preferences: z.array(z.string()).optional(),
+  })
+  // 2. Explicitly type the data argument to fix 'unknown' errors
+  .refine(
+    (data: { startDate: Date; endDate: Date }) =>
+      data.endDate >= data.startDate,
+    {
+      message: "End date must be on or after start date",
+      path: ["endDate"],
+    }
+  );
+
 export const iconWhitelist = SMART_TRIP_ICON_KEYS;
 export const travelPaceOptions = SMART_TRIP_TRAVEL_PACES;
 export type SmartTripRequest = z.infer<typeof smartTripGenerateDto>;
