@@ -27,6 +27,8 @@ const buildItinerarySnapshot = (itinerary: {
   endDate?: Date | null;
   travelers: number;
   estimatedCost?: Prisma.Decimal | number | null;
+  travelPace?: string | null;
+  preferences?: string[] | null;
   type: ItineraryType;
   status: ItineraryStatus;
   tourType: TourType;
@@ -43,6 +45,8 @@ const buildItinerarySnapshot = (itinerary: {
     itinerary.estimatedCost !== null && itinerary.estimatedCost !== undefined
       ? Number((itinerary.estimatedCost as any).toString?.() ?? itinerary.estimatedCost)
       : null,
+  travelPace: itinerary.travelPace ?? null,
+  preferences: itinerary.preferences ?? [],
   type: itinerary.type,
   status: itinerary.status,
   tourType: itinerary.tourType,
@@ -130,6 +134,15 @@ interface CreateBookingDTO {
   role: string;
   itineraryId?: string;
   itinerary?: InlineItineraryDTO;
+  itineraryType?: ItineraryType;
+  destination?: string;
+  startDate?: string;
+  endDate?: string;
+  travelers?: number;
+  budget?: number;
+  travelPace?: string;
+  preferences?: string[];
+  itineraryData?: SmartTripDayInput[];
   totalPrice: number;
   type?: BookingType;
   tourType?: TourType;
@@ -137,6 +150,20 @@ interface CreateBookingDTO {
   customerName?: string;
   customerEmail?: string;
   customerMobile?: string;
+}
+
+interface SmartTripActivityInput {
+  time: string;
+  title: string;
+  iconKey: string;
+  location?: string;
+  description?: string;
+}
+
+interface SmartTripDayInput {
+  day: number;
+  title: string;
+  activities: SmartTripActivityInput[];
 }
 
 interface InlineItineraryDTO {
@@ -186,6 +213,154 @@ interface UpdateBookingItineraryDTO {
 export const BookingService = {
   async createBooking(data: CreateBookingDTO) {
     return prisma.$transaction(async (tx) => {
+      const bookingInclude = {
+        itinerary: {
+          include: {
+            collaborators: true,
+            days: { include: { activities: true }, orderBy: { dayNumber: "asc" } },
+          },
+        },
+      } as const;
+
+      const isSmartTrip =
+        data.itineraryType === ItineraryType.SMART_TRIP || data.itineraryData;
+
+      if (isSmartTrip) {
+        const startDate = data.startDate ? new Date(data.startDate) : undefined;
+        const endDate = data.endDate ? new Date(data.endDate) : undefined;
+
+        const itinerary = await tx.itinerary.create({
+          data: {
+            userId: data.userId,
+            title:
+              data.destination && data.destination.trim().length > 0
+                ? `Smart Trip: ${data.destination}`
+                : "Smart Trip",
+            destination: data.destination ?? "",
+            startDate,
+            endDate,
+            travelers: data.travelers ?? 1,
+            estimatedCost: data.budget as unknown as Prisma.Decimal,
+            type: ItineraryType.SMART_TRIP,
+            status: ItineraryStatus.DRAFT,
+            tourType: data.tourType ?? TourType.PRIVATE,
+            travelPace: data.travelPace ?? undefined,
+            preferences: data.preferences ?? [],
+          },
+        });
+
+        const sortedDays = [...(data.itineraryData ?? [])].sort(
+          (a, b) => a.day - b.day
+        );
+
+        for (const day of sortedDays) {
+          const itineraryDay = await tx.itineraryDay.create({
+            data: {
+              itineraryId: itinerary.id,
+              dayNumber: day.day,
+              title: day.title,
+            },
+          });
+
+          if (day.activities.length > 0) {
+            await tx.activity.createMany({
+              data: day.activities.map((activity, idx) => ({
+                itineraryDayId: itineraryDay.id,
+                time: activity.time,
+                title: activity.title,
+                description: activity.description ?? null,
+                location: activity.location ?? null,
+                icon: activity.iconKey,
+                order: idx,
+              })),
+            });
+          }
+        }
+
+        const itineraryWithRelations = await tx.itinerary.findUnique({
+          where: { id: itinerary.id },
+          include: bookingInclude.itinerary.include,
+        });
+
+        if (itineraryWithRelations) {
+          await tx.itineraryVersion.create({
+            data: {
+              itineraryId: itineraryWithRelations.id,
+              version: itineraryWithRelations.version,
+              snapshot: buildItinerarySnapshot(itineraryWithRelations),
+              createdById: data.userId,
+            },
+          });
+        }
+
+        const bookingCode = await generateBookingCode(tx);
+
+        const booking = await tx.booking.create({
+          data: {
+            bookingCode,
+            userId: data.userId,
+            itineraryId: itinerary.id,
+            destination: itinerary.destination,
+            startDate: startDate ?? undefined,
+            endDate: endDate ?? undefined,
+            travelers: data.travelers ?? 1,
+            totalPrice: data.totalPrice as unknown as Prisma.Decimal,
+            type: data.type ?? BookingType.CUSTOMIZED,
+            tourType: data.tourType ?? TourType.PRIVATE,
+            status: BookingStatus.DRAFT,
+            customerName: data.customerName ?? undefined,
+            customerEmail: data.customerEmail ?? undefined,
+            customerMobile: data.customerMobile ?? undefined,
+          },
+          include: bookingInclude,
+        });
+
+        await logAudit(tx, {
+          actorUserId: data.userId,
+          action: "BOOKING_CREATED",
+          entityType: "BOOKING",
+          entityId: booking.id,
+          metadata: {
+            bookingCode: booking.bookingCode,
+            destination: booking.destination,
+            status: booking.status,
+          },
+          message: `Created booking ${booking.id} for ${booking.destination}`,
+        });
+
+        await NotificationService.create(
+          {
+            userId: data.userId,
+            type: "BOOKING",
+            title: "Booking created",
+            message: `Your booking to ${booking.destination} has been created.`,
+            data: {
+              bookingId: booking.id,
+              bookingCode: booking.bookingCode,
+              status: booking.status,
+              itineraryId: booking.itineraryId,
+              destination: booking.destination ?? undefined,
+            },
+          },
+          tx
+        );
+
+        await NotificationService.notifyAdmins({
+          type: "BOOKING",
+          title: "New booking created",
+          message: `Booking ${booking.bookingCode} requires review`,
+          data: {
+            bookingId: booking.id,
+            bookingCode: booking.bookingCode,
+            status: booking.status,
+            itineraryId: booking.itineraryId,
+            destination: booking.destination ?? undefined,
+          },
+        });
+
+        return booking;
+      }
+
       const shouldCreateItinerary = !data.itineraryId && data.itinerary;
 
       const itinerary = shouldCreateItinerary

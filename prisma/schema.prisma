@@ -173,6 +173,8 @@ model Itinerary {
   endDate       DateTime?
   travelers     Int       @default(1)
   estimatedCost Decimal?  @db.Decimal(10, 2)
+  travelPace    String?
+  preferences   String[]  @default([])
 
   type     ItineraryType   @default(CUSTOMIZED)
   status   ItineraryStatus @default(DRAFT)
