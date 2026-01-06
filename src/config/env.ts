@@ -36,12 +36,31 @@ if (!parsedEnv.success) {
 
 export const env = parsedEnv.data;
 
+/**
+ * Resolves CORS origins with proper fallback logic
+ * Priority: CORS_ORIGINS > FRONTEND_URL > localhost:3000
+ */
 export const resolveCorsOrigins = (): string[] => {
-  const rawOrigins =
-    env.CORS_ORIGINS || env.FRONTEND_URL || "http://localhost:3000";
+  // 1. Prefer CORS_ORIGINS if explicitly set
+  const corsOriginsRaw = env.CORS_ORIGINS?.trim();
+  
+  if (corsOriginsRaw && corsOriginsRaw.length > 0) {
+    const origins = corsOriginsRaw
+      .split(",")
+      .map((origin) => origin.trim())
+      .filter(Boolean); // Remove empty strings
 
-  return rawOrigins
-    .split(",")
-    .map((origin) => origin.trim())
-    .filter(Boolean);
+    if (origins.length > 0) {
+      return origins;
+    }
+  }
+
+  // 2. Fallback to FRONTEND_URL if available
+  const frontendUrl = env.FRONTEND_URL?.trim();
+  if (frontendUrl && frontendUrl.length > 0) {
+    return [frontendUrl];
+  }
+
+  // 3. Final fallback: localhost development
+  return ["http://localhost:3000"];
 };

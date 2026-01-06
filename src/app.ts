@@ -14,34 +14,42 @@ const app = express();
 // Security middleware
 app.use(helmet());
 
-const corsOrigins = resolveCorsOrigins();
+// CORS Configuration
+const allowedOrigins = resolveCorsOrigins();
 
-// CORS configuration
-const allowedOrigins = (process.env.CORS_ORIGINS || "")
-  .split(",")
-  .map((origin) => origin.trim()) 
-  .filter((origin) => origin.length > 0);
+// Startup Validation & Logging
+if (allowedOrigins.length === 0) {
+  console.warn("⚠️  WARNING: No CORS origins configured. Using FRONTEND_URL fallback.");
+}
 
-// Log valid origins on startup so you can verify them immediately
-console.log("✅ CORS Allowed Origins:", allowedOrigins);
+console.log("✅ CORS Configuration:");
+console.log("   NODE_ENV:", process.env.NODE_ENV);
+console.log("   Allowed Origins:", allowedOrigins.length > 0 ? allowedOrigins : ["NONE - Will reject all"]);
 
+// CORS Middleware
 app.use(
   cors({
     origin: (origin, callback) => {
-      // 2. ALLOW SERVER-TO-SERVER: Allow requests with no origin 
-      // (like Postman, mobile apps, or curl requests)
+      // 1. Allow requests with no origin (server-to-server, Postman, mobile apps)
       if (!origin) {
         return callback(null, true);
       }
 
-      // 3. CHECK ORIGIN
-      if (allowedOrigins.includes("*") || allowedOrigins.includes(origin)) {
+      // 2. Check for wildcard FIRST (before expensive array operations)
+      if (allowedOrigins.includes("*")) {
         return callback(null, true);
-      } else {
-        // 4. LOUD FAILURE: Log exactly what was blocked to the server console
-        console.error(`❌ CORS BLOCKED: Request from origin '${origin}' is not allowed.`);
-        return callback(new Error(`CORS not allowed for origin: ${origin}`));
       }
+
+      // 3. Check if origin is in whitelist
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      // 4. REJECT: Log clearly what was blocked
+      console.error(`❌ CORS BLOCKED: "${origin}" not in whitelist`);
+      console.error(`   Expected one of: [${allowedOrigins.join(", ")}]`);
+      
+      return callback(new Error(`CORS policy: Origin "${origin}" is not allowed`));
     },
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
@@ -50,7 +58,6 @@ app.use(
 );
 
 // Logging middleware
-// app.use(morgan(process.env.NODE_ENV === "production" ? "combined" : "dev"));
 app.use(morgan(':method :url :status :response-time ms - :res[content-length]'));
 
 // Body parsing middleware
