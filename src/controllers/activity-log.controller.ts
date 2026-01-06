@@ -5,6 +5,7 @@ import { AuthenticatedRequest } from "@/types";
 import { activityLogListQueryDto } from "@/validators/activity-log.dto";
 import { AppError, createResponse, throwError } from "@/utils/responseHandler";
 import { HTTP_STATUS, Role } from "@/constants/constants";
+import { requireAuthUser } from "@/utils/requestGuards";
 
 export const ActivityLogController = {
   list: async (req: AuthenticatedRequest, res: Response): Promise<void> => {
@@ -12,11 +13,10 @@ export const ActivityLogController = {
       const { page, limit, actorId, type, action, entityType, entityId, dateFrom, dateTo } =
         activityLogListQueryDto.parse(req.query);
 
-        // SECURITY: Force actorId to be the current user if they are not an ADMIN
-      let effectiveActorId = actorId;
-      if (req.user?.role !== Role.ADMIN) {
-         effectiveActorId = req.user?.userId;
-      }
+      const authUser = requireAuthUser(req);
+
+      // SECURITY: Non-admins are only allowed to see their own activity logs
+      const effectiveActorId = authUser.role === Role.ADMIN ? actorId : authUser.userId;
 
       const result = await ActivityLogService.list({
         page,

@@ -94,4 +94,14 @@ export const NotificationService = {
   async markAllRead(userId: string) {
     await prisma.notification.updateMany({ where: { userId, isRead: false }, data: { isRead: true } });
   },
+
+  async clearRead(userId: string) {
+    const result = await prisma.notification.deleteMany({
+      where: {
+        userId,
+        isRead: true,
+      },
+    });
+    return result.count;
+  },
 };

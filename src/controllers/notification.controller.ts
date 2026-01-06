@@ -77,4 +77,27 @@ export const NotificationController = {
       );
     }
   },
+
+  clearRead: async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const authUser = requireAuthUser(req);
+      
+      const count = await NotificationService.clearRead(authUser.userId);
+      
+      createResponse(
+        res, 
+        HTTP_STATUS.OK, 
+        `Cleared ${count} read notifications`
+      );
+    } catch (error) {
+      if (error instanceof AppError) {
+        throw error;
+      }
+      throwError(
+        HTTP_STATUS.INTERNAL_SERVER_ERROR,
+        "Failed to clear read notifications",
+        error
+      );
+    }
+  },
 };

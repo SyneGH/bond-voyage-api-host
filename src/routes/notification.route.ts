@@ -10,5 +10,6 @@ router.use(authenticate);
 router.get("/", asyncHandler(NotificationController.list));
 router.patch("/:id/read", asyncHandler(NotificationController.markRead));
 router.patch("/read-all", asyncHandler(NotificationController.markAllRead));
+router.delete("/clear-read", asyncHandler(NotificationController.clearRead));
 
 export default router;
