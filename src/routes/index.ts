@@ -17,6 +17,7 @@ import aiRoutes from "./ai.route";
 import itineraryRoutes from "./itinerary.route";
 import faqRoutes from "./faq.route";
 import uploadRoutes from "./upload.route";
+import contactRoutes from "./contact.route";
 
 const router = Router();
 
@@ -40,6 +41,7 @@ router.use("/ai", aiRoutes);
 router.use("/itineraries", itineraryRoutes);
 router.use("/faqs", faqRoutes);
 router.use("/upload", uploadRoutes);
+router.use("/contact", contactRoutes);
 
 // Health check route
 router.get("/health", (req, res) => {

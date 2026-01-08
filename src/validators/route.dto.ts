@@ -1,25 +1,18 @@
 import { z } from "zod";
 
-const locationDto = z.object({
-  lat: z.number().min(-90).max(90).optional(),
-  lng: z.number().min(-180).max(180).optional(),
-});
-
 export const optimizeRouteDto = z.object({
-  dayId: z.string().optional(),
-  mode: z.string().optional(),
-  activities: z
-    .array(
-      z.object({
-        id: z.string().min(1),
-        location: z.string().optional(), // Added location string field
-        ...locationDto.shape,
-      })
-      // Refine: Require either (lat+lng) OR (location string)
-      .refine((data) => (data.lat !== undefined && data.lng !== undefined) || (data.location && data.location.length > 0), {
-        message: "Activity must have either coordinates (lat, lng) or a location name.",
-        path: ["location"],
-      })
-    )
-    .min(2, "At least two activities are required"),
+  dayId: z.string().uuid().optional(), // For reference/logging
+  mode: z.enum(["drive", "walk", "bicycle"]).default("drive"),
+  activities: z.array(
+    z.object({
+      id: z.string().min(1),
+      lat: z.number().min(-90).max(90),
+      lng: z.number().min(-180).max(180),
+      name: z.string().optional(),
+      location: z.string().optional(),
+      time: z.string().optional(),
+    })
+  ).min(4, "At least 4 activities required for route optimization"),
+  origin: z.string().optional(), // "lat,lng" format (kept for frontend compatibility)
+  destination: z.string().optional(), // "lat,lng" format (kept for frontend compatibility)
 });
