@@ -21,7 +21,7 @@ router.post('/system', contactController.sendSystemContact);
  */
 router.post(
   '/travel-agency',
-  upload.array('attachments', 10),
+  upload.array('attachments', 5),
   contactController.sendTravelAgencyContact
 );
 
