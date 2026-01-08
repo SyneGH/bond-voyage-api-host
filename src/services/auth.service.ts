@@ -249,7 +249,32 @@ export class AuthService {
       throwError(HTTP_STATUS.NOT_FOUND, "User not found");
     }
 
-    return user;
+    const foundUser = user as NonNullable<typeof user>;
+
+    // If user is ADMIN, calculate average rating from all feedback
+    if (foundUser.role === "ADMIN") {
+      const feedbackStats = await prisma.feedback.aggregate({
+        _avg: {
+          rating: true,
+        },
+        _count: {
+          rating: true,
+        },
+      });
+
+      // Update customerRating with calculated average
+      const avgRating = feedbackStats._avg.rating 
+        ? Number(feedbackStats._avg.rating.toFixed(2)) 
+        : null;
+
+      // Return user with calculated customerRating
+      return {
+        ...foundUser,
+        customerRating: avgRating,
+      };
+    }
+
+    return foundUser;
   }
 }
 
