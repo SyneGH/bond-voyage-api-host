@@ -185,13 +185,54 @@ export const DashboardService = {
       },
     };
   },
-  async getSelfStats(year: number, userId: string) {
+
+async getSelfStats(year: number, userId: string) {
     const userScope: Prisma.BookingWhereInput = {
       OR: [
         { userId },
         { itinerary: { collaborators: { some: { userId } } } },
       ],
     };
+
+    const itineraryScope: Prisma.ItineraryWhereInput = {
+      OR: [
+        { userId },
+        { collaborators: { some: { userId } } },
+      ],
+    };
+
+    // Compute actual card values for the user
+    const [travelPlans, pendingBookings, activeBookings, completedTrips] =
+      await prisma.$transaction([
+        // Travel Plans: Count itineraries in DRAFT status (not yet converted to booking)
+        prisma.itinerary.count({
+          where: {
+            ...itineraryScope,
+            status: "DRAFT",
+          },
+        }),
+        // Pending: Bookings awaiting approval
+        prisma.booking.count({
+          where: {
+            ...userScope,
+            status: "PENDING",
+          },
+        }),
+        // Active Bookings: Confirmed bookings
+        prisma.booking.count({
+          where: {
+            ...userScope,
+            status: "CONFIRMED",
+          },
+        }),
+        // Completed Trips: Finished bookings
+        prisma.booking.count({
+          where: {
+            ...userScope,
+            status: "COMPLETED",
+          },
+        }),
+      ]);
 
     const userProfile = await prisma.user.findUnique({
       where: { id: userId },
@@ -238,14 +279,14 @@ export const DashboardService = {
       },
     });
 
-    const statusDistribution = {
+    const statusDistribution: { completed: number; pending: number; active: number; cancelled: number } = {
       completed: 0,
       pending: 0,
       active: 0,
       cancelled: 0,
     };
 
-    const extractCount = (group: { _count?: unknown }) => {
+    const extractCount = (group: { _count?: unknown }): number => {
       if (typeof group._count === "object" && group._count !== null) {
         const maybeCount = (group._count as { _all?: number })._all;
         return typeof maybeCount === "number" ? maybeCount : 0;
@@ -282,10 +323,7 @@ export const DashboardService = {
       },
     });
 
-    const typeDistribution: Record<
-      "standard" | "requested" | "customized",
-      number
-    > = {
+    const typeDistribution: { standard: number; requested: number; customized: number } = {
       standard: 0,
       requested: 0,
       customized: 0,
@@ -311,11 +349,10 @@ export const DashboardService = {
     return {
       user: userProfile,
       cards: {
-        totalBookings: 0,
-        pendingApprovals: 0,
-        activeBookings: 0,
-        completedTrips: 0,
-        faqsCard: 0,
+        travelPlans,
+        pending: pendingBookings,
+        activeBookings,
+        completedTrips,
       },
       trends: {
         year,

@@ -1,6 +1,7 @@
 export const formatDisplayDate = (date?: Date | string | null): string | null => {
   if (!date) return null;
   const d = new Date(date);
+  if (isNaN(d.getTime())) return null;
   
   // Returns format: "Jan 2, 2026, 12:11 PM"
   return new Intl.DateTimeFormat('en-PH', {
@@ -21,18 +22,68 @@ export const parseBookingDate = (dateString: string | Date | undefined): Date | 
   return new Date(dateString); 
 };
 
-/*
+/**
+ * Format date for display: "Jan 7, 2026"
+ */
+export const formatDateOnly = (date?: Date | string | null): string | null => {
+  if (!date) return null;
+  const d = new Date(date);
+  if (isNaN(d.getTime())) return null;
+  
+  return new Intl.DateTimeFormat('en-PH', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  }).format(d);
+};
 
-The Solution: Keep new Date(), but ensure you are ignoring the time component effectively. A common trick is to force the time to noon or explicitly treat the string as UTC to prevent it from shifting to the previous day.
+/**
+ * Format date and time for display: "Jan 7, 2026, 2:43 PM"
+ */
+export const formatDateTime = (date?: Date | string | null): string | null => {
+  if (!date) return null;
+  const d = new Date(date);
+  if (isNaN(d.getTime())) return null;
+  
+  return new Intl.DateTimeFormat('en-PH', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  }).format(d);
+};
 
-Recommended Helper Function: Add this to your backend src/utils/dateFormatter.ts and use it in your services instead of raw new Date().
-
-booking.service.ts
-
-import { parseBookingDate } from "@/utils/dateFormatter";
-
-// ... inside createBooking ...
-startDate: parseBookingDate(data.itinerary?.startDate),
-endDate: parseBookingDate(data.itinerary?.endDate),
-
-*/
+/**
+ * Format date range for display: "Jan 7 – Jan 10, 2026"
+ */
+export const formatDateRange = (
+  startDate?: Date | string | null,
+  endDate?: Date | string | null
+): string | null => {
+  if (!startDate || !endDate) return null;
+  
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  
+  if (isNaN(start.getTime()) || isNaN(end.getTime())) return null;
+  
+  const sameYear = start.getFullYear() === end.getFullYear();
+  const sameMonth = sameYear && start.getMonth() === end.getMonth();
+  const sameDay = sameMonth && start.getDate() === end.getDate();
+  
+  if (sameDay) {
+    // Same day: "Jan 7, 2026"
+    return new Intl.DateTimeFormat('en-PH', { month: 'short', day: 'numeric', year: 'numeric' }).format(start);
+  } else if (sameMonth) {
+    // Same month: "Jan 7 – 10, 2026"
+    return `${new Intl.DateTimeFormat('en-PH', { month: 'short', day: 'numeric' }).format(start)} – ${end.getDate()}, ${end.getFullYear()}`;
+  } else if (sameYear) {
+    // Same year: "Jan 7 – Feb 10, 2026"
+    return `${new Intl.DateTimeFormat('en-PH', { month: 'short', day: 'numeric' }).format(start)} – ${new Intl.DateTimeFormat('en-PH', { month: 'short', day: 'numeric' }).format(end)}, ${end.getFullYear()}`;
+  } else {
+    // Different years: "Dec 28, 2025 – Jan 3, 2026"
+    return `${new Intl.DateTimeFormat('en-PH', { month: 'short', day: 'numeric', year: 'numeric' }).format(start)} – ${new Intl.DateTimeFormat('en-PH', { month: 'short', day: 'numeric', year: 'numeric' }).format(end)}`;
+  }
+};

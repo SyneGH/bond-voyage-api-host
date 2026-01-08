@@ -12,7 +12,7 @@ import {
 import { BookingDTO } from "@/dtos/booking.dto";
 import { ItineraryDTO } from "@/dtos/itinerary.dto";
 import { NotificationDTO } from "@/dtos/notification.dto";
-import { formatDisplayDate } from "@/utils/dateFormatter";
+import { formatDisplayDate, formatDateOnly, formatDateTime, formatDateRange } from "@/utils/dateFormatter";
 
 export const toISO = (date?: Date | null): string | null => {
   if (!date) return null;
@@ -108,6 +108,8 @@ type SerializedBookingInput = Booking & {
   itinerary?: SerializedItineraryInput | null;
 };
 
+// Replace the serializeBooking function with this updated version:
+
 export const serializeBooking = (
   booking?: SerializedBookingInput | null,
   viewerId?: string
@@ -128,8 +130,13 @@ export const serializeBooking = (
     itineraryId: booking.itineraryId,
     userId: booking.userId,
     destination: booking.destination ?? null,
+    // ISO dates for programmatic use
     startDate: toISO(booking.startDate),
     endDate: toISO(booking.endDate),
+    // Formatted dates for display
+    startDateDisplay: formatDateOnly(booking.startDate),
+    endDateDisplay: formatDateOnly(booking.endDate),
+    dateRangeDisplay: formatDateRange(booking.startDate, booking.endDate),
     travelers: booking.travelers ?? null,
     totalPrice: decimalToNumber(booking.totalPrice),
     type: booking.type,
@@ -143,9 +150,14 @@ export const serializeBooking = (
     customerName: (booking as any).customerName ?? null,
     customerEmail: (booking as any).customerEmail ?? null,
     customerMobile: (booking as any).customerMobile ?? null,
+    // ISO dates
     bookedDate: toISO((booking as any).bookedDate),
     createdAt: toISO((booking as any).createdAt),
     updatedAt: toISO((booking as any).updatedAt),
+    // Formatted dates for display
+    bookedDateDisplay: formatDateTime((booking as any).bookedDate),
+    createdAtDisplay: formatDateTime((booking as any).createdAt),
+    updatedAtDisplay: formatDateTime((booking as any).updatedAt),
     itinerary: serializeItinerary(booking.itinerary ?? undefined),
     ownership,
   };
