@@ -7,35 +7,6 @@ import { GeoapifyService } from "@/services/geoapify.service";
 
 const MAX_MATRIX_POINTS = 25;
 
-// Helper: Ensures every activity has valid lat/lng before processing
-const resolveActivityCoordinates = async (activities: any[]) => {
-  return Promise.all(
-    activities.map(async (activity) => {
-      // 1. If we already have valid coordinates, use them
-      if (typeof activity.lat === "number" && typeof activity.lng === "number") {
-        return { ...activity, lat: activity.lat, lng: activity.lng };
-      }
-
-      // 2. If we have a location string, fetch coordinates
-      if (activity.location) {
-        try {
-          // Ensure this method exists in your Service (see step 2 below)
-          const coords = await GeoapifyService.getCoordinates(activity.location);
-          return { ...activity, lat: coords.lat, lng: coords.lng };
-        } catch (error) {
-          console.warn(`Failed to geocode location: ${activity.location}`, error);
-        }
-      }
-
-      // 3. Fallback: Throw error if we can't find coordinates
-      throwError(
-        HTTP_STATUS.BAD_REQUEST, 
-        `Missing coordinates for activity: ${activity.id || 'Unknown'}`
-      );
-    })
-  );
-};
-
 export const RouteController = {
   // ---------------------------------------------------------
   // 1. CALCULATE (Lightweight, Default Automatic)
@@ -43,14 +14,13 @@ export const RouteController = {
   calculate: async (req: Request, res: Response): Promise<void> => {
     try {
       const payload = optimizeRouteDto.parse(req.body);
-      const rawActivities = payload.activities;
+      const activities = payload.activities;
       const mode = payload.mode ?? "drive";
 
-      // FIX: Resolve coordinates first, just like in optimize
-      const activities = await resolveActivityCoordinates(rawActivities);
+      // Prepare coordinates for routing
+      const coordsOnly = activities.map((a) => ({ lat: a.lat, lng: a.lng }));
 
-      const routingResponse = await GeoapifyService.route(activities, mode);
-
+      const routingResponse = await GeoapifyService.route(coordsOnly, mode);
       const routingFeature = (routingResponse as any)?.features?.[0];
       const routeGeometry = routingFeature?.geometry;
       const routeProps = routingFeature?.properties;
@@ -60,7 +30,7 @@ export const RouteController = {
       }
 
       createResponse(res, HTTP_STATUS.OK, "Route calculated", {
-        optimizedActivities: activities,
+        activities: activities,
         routeGeometry,
         totalDistance: routeProps?.distance ?? 0,
         totalTime: routeProps?.time ?? 0,
@@ -76,22 +46,40 @@ export const RouteController = {
   optimize: async (req: Request, res: Response): Promise<void> => {
     try {
       const payload = optimizeRouteDto.parse(req.body);
-      const rawActivities = payload.activities;
+      const activities = payload.activities;
       const mode = payload.mode ?? "drive";
 
-      if (rawActivities.length > MAX_MATRIX_POINTS) {
+      if (activities.length > MAX_MATRIX_POINTS) {
         throwError(
           HTTP_STATUS.BAD_REQUEST,
           `Too many activities. Maximum allowed is ${MAX_MATRIX_POINTS}.`
         );
       }
 
-      // FIX: Use the shared helper
-      const activities = await resolveActivityCoordinates(rawActivities);
+      // Validate coordinates
+      for (const activity of activities) {
+        if (typeof activity.lat !== "number" || typeof activity.lng !== "number") {
+          throwError(
+            HTTP_STATUS.BAD_REQUEST,
+            `Invalid coordinates for activity: ${activity.id}`
+          );
+        }
+      }
 
-      // Cast to ensure strict type safety for the service call
       const coordsOnly = activities.map((a) => ({ lat: a.lat, lng: a.lng }));
 
+      // ========================================
+      // STEP 1: Calculate ORIGINAL route
+      // ========================================
+      const originalRoutingResponse = await GeoapifyService.route(coordsOnly, mode);
+      const originalFeature = (originalRoutingResponse as any)?.features?.[0];
+      const originalRouteGeometry = originalFeature?.geometry;
+      const originalDistance = originalFeature?.properties?.distance || 0; // meters
+      const originalTime = originalFeature?.properties?.time || 0; // seconds
+
+      // ========================================
+      // STEP 2: Get route matrix and optimize
+      // ========================================
       const matrix = await GeoapifyService.routeMatrix(coordsOnly, mode);
       const order = buildNearestNeighborOrder(matrix.times);
       const optimizedActivities = order.map((index) => activities[index]);
@@ -102,32 +90,41 @@ export const RouteController = {
         matrix.times
       );
 
-      const optimizedCoords = optimizedActivities.map((a) => ({ lat: a.lat, lng: a.lng }));
-      const routingResponse = await GeoapifyService.route(optimizedCoords, mode);
+      // ========================================
+      // STEP 3: Calculate OPTIMIZED route geometry
+      // ========================================
+      const optimizedCoords = optimizedActivities.map((a) => ({ 
+        lat: a.lat, 
+        lng: a.lng 
+      }));
+      const optimizedRoutingResponse = await GeoapifyService.route(optimizedCoords, mode);
+      const optimizedFeature = (optimizedRoutingResponse as any)?.features?.[0];
+      const optimizedRouteGeometry = optimizedFeature?.geometry;
+      const optimizedDistance = optimizedFeature?.properties?.distance || totalsFromMatrix.totalDistance;
+      const optimizedTime = optimizedFeature?.properties?.time || totalsFromMatrix.totalTime;
 
-      const routingFeature = (routingResponse as any)?.features?.[0];
-      const routeGeometry = routingFeature?.geometry;
-      const routeProps = routingFeature?.properties;
-
-      if (!routeGeometry) {
+      if (!optimizedRouteGeometry) {
         throwError(HTTP_STATUS.BAD_GATEWAY, "Geoapify routing response missing geometry");
       }
 
-      // Prefer API totals, fallback to matrix totals
-      const totalDistance =
-        typeof routeProps?.distance === "number"
-          ? routeProps.distance
-          : totalsFromMatrix.totalDistance;
-      const totalTime =
-        typeof routeProps?.time === "number"
-          ? routeProps.time
-          : totalsFromMatrix.totalTime;
+      // ========================================
+      // STEP 4: Calculate savings
+      // ========================================
+      const distanceSaved = Math.max(0, originalDistance - optimizedDistance);
+      const timeSaved = Math.max(0, originalTime - optimizedTime);
 
+      // ========================================
+      // STEP 5: Return comprehensive response
+      // ========================================
       createResponse(res, HTTP_STATUS.OK, "Route optimized", {
-        optimizedActivities,
-        routeGeometry,
-        totalDistance,
-        totalTime,
+        activities: optimizedActivities,
+        routeGeometry: optimizedRouteGeometry,
+        originalRouteGeometry: originalRouteGeometry,
+        originalDistance: Math.round(originalDistance / 1000 * 10) / 10, // km, 1 decimal
+        optimizedDistance: Math.round(optimizedDistance / 1000 * 10) / 10, // km, 1 decimal
+        kilometerSaved: Math.round(distanceSaved / 1000 * 10) / 10, // km, 1 decimal
+        totalTime: Math.round(optimizedTime / 60), // minutes
+        timeSaved: Math.round(timeSaved / 60), // minutes
         matrixSummary: totalsFromMatrix,
       });
     } catch (error) {
