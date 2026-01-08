@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import contactController from '@/controllers/contact.controller';
-import { upload } from '@/middleware/upload.middleware';
+import { upload } from '@/middlewares/upload.middleware';
 
 const router = Router();
 

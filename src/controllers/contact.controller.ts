@@ -5,10 +5,9 @@ import {
   systemContactDto,
   travelAgencyContactDto,
 } from '@/validators/contact.dto';
-import { fileToBase64, cleanupFiles } from '@/middleware/upload.middleware';
-import { HTTP_STATUS } from '@/types/enums/http.enum';
-import { createResponse, throwError } from '@/utils/response.util';
-import { AppError } from '@/utils/custom-error.util';
+import { fileToBase64, cleanupFiles } from '@/middlewares/upload.middleware';
+import { HTTP_STATUS } from '@/constants/constants';
+import { createResponse, throwError, AppError } from '@/utils/responseHandler';
 
 class ContactController {
   /**
