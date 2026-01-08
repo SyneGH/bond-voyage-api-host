@@ -392,6 +392,14 @@ class UserController {
       const authUser = requireAuthUser(req);
 
       const updateData = updateProfileDto.parse(req.body);
+
+    if (updateData.companyName !== undefined && authUser.role !== "ADMIN") {
+      throwError(
+        HTTP_STATUS.FORBIDDEN,
+        "Only admin users can update company name"
+      );
+    }
+
       const user = await userService.updateProfileWithLog(
         authUser.userId,
         updateData

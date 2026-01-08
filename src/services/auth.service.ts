@@ -1,4 +1,5 @@
 import { prisma } from "@/config/database";
+import { Prisma } from "@prisma/client";
 import { AuthUtils } from "@/utils/auth";
 import { User, UserRole } from "@prisma/client";
 import userService from "@/services/user.service";
@@ -160,17 +161,37 @@ export class AuthService {
       role: authUser.role,
     };
 
-    const { accessToken, refreshToken: newRefreshToken } =
-      AuthUtils.generateTokenPair(tokenPayload);
+    const accessToken = AuthUtils.generateAccessToken(tokenPayload);
 
-    await prisma.user.update({
-      where: { id: authUser.id },
-      data: {
-        refreshTokens: authUser.refreshTokens
-          .filter((token) => token !== refreshToken)
-          .concat(newRefreshToken),
-      },
-    });
+    // SMART ROTATION LOGIC
+    // Check if the current refresh token is expiring soon (e.g., < 24 hours).
+    // decoded.exp is in seconds (Unix timestamp).
+    const nowInSeconds = Math.floor(Date.now() / 1000);
+    const exp = decoded.exp || 0;
+    const bufferSeconds = 24 * 60 * 60; // 1 day buffer (adjust as needed)
+
+    // Only rotate if expiring soon
+    if ((exp - nowInSeconds) < bufferSeconds) {
+      const newRefreshToken = AuthUtils.generateRefreshToken(tokenPayload);
+
+      await prisma.user.update({
+        where: { id: authUser.id },
+        data: {
+          refreshTokens: authUser.refreshTokens
+            .filter((token) => token !== refreshToken)
+            .concat(newRefreshToken),
+        },
+      });
+
+      await logAudit(prisma, {
+        actorUserId: authUser.id,
+        action: "AUTH_REFRESH",
+        entityType: "AUTH",
+        message: "Refresh token rotated (expiring soon)",
+      });
+
+      return { accessToken, refreshToken: newRefreshToken };
+    }
 
     await logAudit(prisma, {
       actorUserId: authUser.id,
@@ -179,7 +200,7 @@ export class AuthService {
       message: "Refresh token rotated",
     });
 
-    return { accessToken, refreshToken: newRefreshToken };
+    return { accessToken, refreshToken };
   }
 
   async resetPassword(email: string, newPassword: string) {
@@ -262,9 +283,9 @@ export class AuthService {
         },
       });
 
-      // Update customerRating with calculated average
+      // Update customerRating with calculated average as Prisma Decimal
       const avgRating = feedbackStats._avg.rating 
-        ? Number(feedbackStats._avg.rating.toFixed(2)) 
+        ? new Prisma.Decimal(feedbackStats._avg.rating.toFixed(2))
         : null;
 
       // Return user with calculated customerRating

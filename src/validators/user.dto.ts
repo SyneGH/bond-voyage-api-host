@@ -50,6 +50,12 @@ export const updateProfileDto = z.object({
     .email()
     .regex(Regex.EMAIL_PATTERN)
     .optional(),
+  companyName: z
+    .string()
+    .min(2, { message: "Company name must be at least 2 characters" })
+    .max(100, { message: "Company name must be less than 100 characters" })
+    .optional()
+    .or(z.literal("")),
   yearsInOperation: z
     .preprocess((val) => {
       if (val === null || val === undefined || val === "") return null;
