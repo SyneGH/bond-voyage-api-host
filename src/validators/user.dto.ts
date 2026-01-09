@@ -50,6 +50,11 @@ export const updateProfileDto = z.object({
     .email()
     .regex(Regex.EMAIL_PATTERN)
     .optional(),
+  avatarUrl: z
+    .string()
+    .max(5000000) // Limit to ~5MB for base64 strings (adjust as needed)
+    .optional()
+    .or(z.literal("")),
   companyName: z
     .string()
     .min(2, { message: "Company name must be at least 2 characters" })

@@ -138,7 +138,10 @@ export const createBookingDto = z
   });
 
 export const updateItineraryDto = z
-  .object({
+.object({
+    customerName: z.string().min(1, "Customer name is required").optional(),
+    customerEmail: z.string().email("Invalid email address").optional(),
+    customerMobile: z.string().min(1, "Customer mobile number is required").optional(),
     destination: z.string().min(1),
     startDate: dateSchema,
     endDate: dateSchema,

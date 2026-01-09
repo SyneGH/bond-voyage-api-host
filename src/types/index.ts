@@ -48,7 +48,9 @@ export interface UserUpdateDto {
   middleName?: string;
   lastName?: string;
   email?: string;
+  avatarUrl?: string;
   yearsInOperation?: number | null;
+  companyName?: string | null;
 }
 
 export interface ChangePasswordDto {

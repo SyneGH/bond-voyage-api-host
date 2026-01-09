@@ -87,4 +87,30 @@ export const FeedbackController = {
       );
     }
   },
+
+  myFeedback: async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const authUser = requireAuthUser(req);
+      const { page, limit } = feedbackListQueryDto.parse(req.query);
+      
+      const result = await FeedbackService.listByUser(authUser.userId, { page, limit });
+      
+      createResponse(
+        res,
+        HTTP_STATUS.OK,
+        "Your feedback retrieved",
+        result.items,
+        result.meta
+      );
+    } catch (error) {
+      if (error instanceof AppError) {
+        throw error;
+      }
+      throwError(
+        HTTP_STATUS.INTERNAL_SERVER_ERROR,
+        "Failed to fetch your feedback",
+        error
+      );
+    }
+  },
 };

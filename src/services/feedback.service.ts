@@ -54,4 +54,43 @@ export const FeedbackService = {
       },
     });
   },
+
+  listByUser: async (
+    userId: string,
+    options: { page?: number; limit?: number }
+  ): Promise<{ items: any[]; meta: any }> => {
+    const page = options.page || 1;
+    const limit = options.limit || 10;
+    const skip = (page - 1) * limit;
+
+    const [items, total] = await Promise.all([
+      prisma.feedback.findMany({
+        where: { userId },
+        skip,
+        take: limit,
+        orderBy: { createdAt: "desc" },
+        include: {
+          user: {
+            select: {
+              id: true,
+              email: true,
+              firstName: true,
+              lastName: true,
+            },
+          },
+        },
+      }),
+      prisma.feedback.count({ where: { userId } }),
+    ]);
+
+    return {
+      items,
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  },
 };

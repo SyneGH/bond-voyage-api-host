@@ -13,6 +13,12 @@ router.post(
 );
 
 router.get(
+  "/my",
+  authenticate,
+  asyncHandler(FeedbackController.myFeedback)
+);
+
+router.get(
   "/",
   authenticate,
   authorize([Role.ADMIN]),

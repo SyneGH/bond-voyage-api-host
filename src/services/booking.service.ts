@@ -189,6 +189,9 @@ interface InlineItineraryDTO {
 }
 
 interface UpdateBookingItineraryDTO {
+  customerName?: string;
+  customerEmail?: string;
+  customerMobile?: string;
   destination: string;
   startDate: Date;
   endDate: Date;
@@ -625,6 +628,10 @@ export const BookingService = {
           travelers: data.travelers,
           totalPrice: data.totalPrice as unknown as Prisma.Decimal,
           isResolved: false,
+
+          ...(data.customerName !== undefined && { customerName: data.customerName }),
+          ...(data.customerEmail !== undefined && { customerEmail: data.customerEmail }),
+          ...(data.customerMobile !== undefined && { customerMobile: data.customerMobile }),
         },
       });
 
@@ -636,6 +643,7 @@ export const BookingService = {
         metadata: {
           destination,
           travelers,
+          customerUpdated: !!(data.customerName || data.customerEmail || data.customerMobile),
         },
         message: `Updated itinerary for booking ${bookingId}`,
       });
