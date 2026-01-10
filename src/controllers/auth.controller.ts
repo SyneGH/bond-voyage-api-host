@@ -166,8 +166,20 @@ class AuthController {
         accessToken: tokenPayload.accessToken,
       });
     } catch (error: any) {
-      if (error.name === "TokenExpiredError" || error.name === "JsonWebTokenError") {
-        throwError(HTTP_STATUS.UNAUTHORIZED, "Invalid or expired refresh token");
+      if (error.name === "TokenExpiredError") {
+        throwError(
+          HTTP_STATUS.UNAUTHORIZED, 
+          "Refresh token expired",
+          { code: "REFRESH_TOKEN_EXPIRED" }
+        );
+      }
+      
+      if (error.name === "JsonWebTokenError") {
+        throwError(
+          HTTP_STATUS.UNAUTHORIZED, 
+          "Invalid refresh token",
+          { code: "REFRESH_TOKEN_INVALID" }
+        );
       }
 
       // Pass through existing AppErrors (e.g., if authService throws "User not found")

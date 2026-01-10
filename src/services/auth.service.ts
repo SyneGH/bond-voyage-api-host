@@ -117,12 +117,13 @@ export class AuthService {
     const { accessToken, refreshToken } =
       AuthUtils.generateTokenPair(tokenPayload);
 
+    // Single-session enforcement: Clear all existing sessions
+    const hadExistingSessions = authUser.refreshTokens.length > 0;
+
     await prisma.user.update({
       where: { id: authUser.id },
       data: {
-        refreshTokens: {
-          push: refreshToken,
-        },
+        refreshTokens: [refreshToken], // Replace all tokens with new one
         lastLogin: new Date(),
       },
     });
@@ -131,8 +132,13 @@ export class AuthService {
       actorUserId: authUser.id,
       action: "AUTH_LOGIN",
       entityType: "AUTH",
-      metadata: { email: authUser.email },
-      message: "User login successful",
+      metadata: { 
+        email: authUser.email,
+        sessionReplaced: hadExistingSessions,
+      },
+      message: hadExistingSessions 
+        ? "User login successful - previous session invalidated"
+        : "User login successful",
     });
 
     return { user: authUser, accessToken, refreshToken };
@@ -151,7 +157,18 @@ export class AuthService {
     const authUser = user as NonNullable<typeof user>;
 
     if (!authUser.isActive || !authUser.refreshTokens.includes(refreshToken)) {
-      throwError(HTTP_STATUS.UNAUTHORIZED, "Invalid refresh token");
+      // Check if user has ANY refresh tokens - if yes, session was replaced
+      const sessionWasReplaced = authUser.refreshTokens.length > 0;
+      
+      throwError(
+        HTTP_STATUS.UNAUTHORIZED, 
+        sessionWasReplaced 
+          ? "Session invalidated - logged in from another device"
+          : "Invalid refresh token",
+        { 
+          code: sessionWasReplaced ? "SESSION_REPLACED" : "REFRESH_TOKEN_INVALID"
+        }
+      );
     }
 
     const tokenPayload = {

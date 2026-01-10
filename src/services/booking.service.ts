@@ -133,6 +133,7 @@ interface CreateBookingDTO {
   userId: string;
   role: string;
   itineraryId?: string;
+  tourPackageId?: string;
   itinerary?: InlineItineraryDTO;
   itineraryType?: ItineraryType;
   destination?: string;
@@ -337,6 +338,141 @@ export const BookingService = {
             type: "BOOKING",
             title: "Booking created",
             message: `Your booking to ${booking.destination} has been created.`,
+            data: {
+              bookingId: booking.id,
+              bookingCode: booking.bookingCode,
+              status: booking.status,
+              itineraryId: booking.itineraryId,
+              destination: booking.destination ?? undefined,
+            },
+          },
+          tx
+        );
+
+        await NotificationService.notifyAdmins({
+          type: "BOOKING",
+          title: "New booking created",
+          message: `Booking ${booking.bookingCode} requires review`,
+          data: {
+            bookingId: booking.id,
+            bookingCode: booking.bookingCode,
+            status: booking.status,
+            itineraryId: booking.itineraryId,
+            destination: booking.destination ?? undefined,
+          },
+        });
+
+        return booking;
+      }
+
+      if (data.tourPackageId) {
+        const tourPackage = await tx.tourPackage.findUnique({
+          where: { id: data.tourPackageId },
+          include: {
+            days: {
+              orderBy: { dayNumber: "asc" },
+              include: { activities: { orderBy: { order: "asc" } } },
+            },
+          },
+        });
+
+        if (!tourPackage) {
+          throw new Error("TOUR_PACKAGE_NOT_FOUND");
+        }
+
+        const startDate = data.startDate ? new Date(data.startDate) : undefined;
+        const endDate = data.endDate ? new Date(data.endDate) : undefined;
+
+        // Create itinerary from tour package
+        const itinerary = await tx.itinerary.create({
+          data: {
+            userId: data.userId,
+            title: tourPackage.title,
+            destination: tourPackage.destination,
+            startDate,
+            endDate,
+            travelers: data.travelers ?? 1,
+            estimatedCost: tourPackage.price,
+            type: ItineraryType.STANDARD,
+            status: ItineraryStatus.DRAFT,
+            tourType: data.tourType ?? TourType.PRIVATE,
+            days: {
+              create: tourPackage.days.map((day, dayIndex) => ({
+                dayNumber: day.dayNumber,
+                title: day.title,
+                date: startDate
+                  ? new Date(startDate.getTime() + dayIndex * 24 * 60 * 60 * 1000)
+                  : undefined,
+                activities: {
+                  create: day.activities.map((activity) => ({
+                    time: activity.time,
+                    title: activity.title,
+                    description: activity.description,
+                    location: activity.location,
+                    icon: activity.icon,
+                    order: activity.order,
+                  })),
+                },
+              })),
+            },
+          },
+          include: {
+            collaborators: true,
+            days: { include: { activities: true }, orderBy: { dayNumber: "asc" } },
+          },
+        });
+
+        await tx.itineraryVersion.create({
+          data: {
+            itineraryId: itinerary.id,
+            version: itinerary.version,
+            snapshot: buildItinerarySnapshot(itinerary),
+            createdById: data.userId,
+          },
+        });
+
+        const bookingCode = await generateBookingCode(tx);
+
+        const booking = await tx.booking.create({
+          data: {
+            bookingCode,
+            userId: data.userId,
+            itineraryId: itinerary.id,
+            destination: itinerary.destination,
+            startDate: startDate ?? undefined,
+            endDate: endDate ?? undefined,
+            travelers: data.travelers ?? 1,
+            totalPrice: data.totalPrice as unknown as Prisma.Decimal,
+            type: BookingType.STANDARD,
+            tourType: data.tourType ?? TourType.PRIVATE,
+            status: BookingStatus.DRAFT,
+            customerName: data.customerName ?? undefined,
+            customerEmail: data.customerEmail ?? undefined,
+            customerMobile: data.customerMobile ?? undefined,
+          },
+          include: bookingInclude,
+        });
+
+        await logAudit(tx, {
+          actorUserId: data.userId,
+          action: "BOOKING_CREATED",
+          entityType: "BOOKING",
+          entityId: booking.id,
+          metadata: {
+            bookingCode: booking.bookingCode,
+            destination: booking.destination,
+            status: booking.status,
+            tourPackageId: data.tourPackageId,
+          },
+          message: `Created STANDARD booking ${booking.id} from tour package ${tourPackage.title}`,
+        });
+
+        await NotificationService.create(
+          {
+            userId: data.userId,
+            type: "BOOKING",
+            title: "Booking created",
+            message: `Your booking for ${tourPackage.title} has been created.`,
             data: {
               bookingId: booking.id,
               bookingCode: booking.bookingCode,

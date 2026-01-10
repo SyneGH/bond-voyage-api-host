@@ -26,7 +26,12 @@ export const authenticate = async (
       const user = await userService.findById(decoded.userId);
 
       if (!user || !user.isActive) {
-        createResponse(res, HTTP_STATUS.UNAUTHORIZED, "User not found or inactive");
+        createResponse(
+          res, 
+          HTTP_STATUS.UNAUTHORIZED, 
+          "User not found or inactive",
+          { code: "USER_INACTIVE" }
+        );
         return;
       }
 
@@ -38,7 +43,24 @@ export const authenticate = async (
 
       next();
     } catch (error) {
-      createResponse(res, HTTP_STATUS.UNAUTHORIZED, "Invalid or expired access token");
+        const errorName = error instanceof Error ? error.name : "UnknownError";
+        
+        // Provide specific error codes for different scenarios
+        if (errorName === "TokenExpiredError") {
+          createResponse(
+            res, 
+            HTTP_STATUS.UNAUTHORIZED, 
+            "Access token expired",
+            { code: "TOKEN_EXPIRED" }
+          );
+        } else {
+          createResponse(
+            res, 
+            HTTP_STATUS.UNAUTHORIZED, 
+            "Invalid access token",
+            { code: "TOKEN_INVALID" }
+          );
+        }
       return;
     }
   } catch (error) {

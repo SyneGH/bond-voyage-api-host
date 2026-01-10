@@ -45,6 +45,9 @@ export const BookingController = {
       if (error instanceof Error && error.message === "ITINERARY_NOT_FOUND") {
         throwError(HTTP_STATUS.NOT_FOUND, "Itinerary not found");
       }
+      if (error instanceof Error && error.message === "TOUR_PACKAGE_NOT_FOUND") {
+        throwError(HTTP_STATUS.NOT_FOUND, "Tour package not found");
+      }
       if (error instanceof Error && error.message === "ITINERARY_FORBIDDEN") {
         throwError(HTTP_STATUS.FORBIDDEN, "Forbidden");
       }

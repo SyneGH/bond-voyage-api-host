@@ -81,6 +81,7 @@ export const createBookingDto = z
     customerMobile: z.string().min(1, "Customer mobile number is required"),
 
     itineraryId: z.string().uuid().optional(),
+    tourPackageId: z.string().uuid().optional(),
     itinerary: inlineItineraryDto.optional(),
     totalPrice: z.number().min(0),
     type: z.enum(["STANDARD", "CUSTOMIZED", "REQUESTED"]).optional(),
@@ -99,14 +100,14 @@ export const createBookingDto = z
     itineraryData: smartTripItineraryDataDto.optional(),
   })
   .superRefine((data, ctx) => {
-    const hasLegacyItinerary = data.itineraryId || data.itinerary;
+    const hasLegacyItinerary = data.itineraryId || data.tourPackageId || data.itinerary;
     const isSmartTrip =
       data.itineraryType === "SMART_TRIP" || data.itineraryData !== undefined;
 
     if (!hasLegacyItinerary && !isSmartTrip) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "itineraryId or itinerary is required",
+        message: "itineraryId, tourPackageId, or itinerary is required",
         path: ["itineraryId"],
       });
       return;
