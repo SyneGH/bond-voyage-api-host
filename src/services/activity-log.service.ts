@@ -11,6 +11,11 @@ interface RequestContext {
   userAgent?: string;
 }
 
+interface RequestContext {
+  ipAddress?: string;
+  userAgent?: string;
+}
+
 interface AuditLogPayload {
   actorUserId: string;
   action: string;
