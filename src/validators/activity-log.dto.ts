@@ -28,9 +28,12 @@ export const activityLogListQueryDto = z.object({
   page: z.preprocess((val) => parseNumber(val, 1), z.number().int().min(1)),
   limit: z.preprocess((val) => parseNumber(val, 10), z.number().int().min(1)),
   actorId: z.string().uuid().optional(),
+  actorRole: z.enum(["ADMIN", "USER"]).optional(),
+  eventCode: z.string().optional(),
   action: z.string().optional(),
   entityType: z.string().optional(),
   entityId: z.string().optional(),
+  targetUserId: z.string().uuid().optional(),
   // Legacy alias for backward compatibility
   type: z.string().optional(),
   dateFrom: dateQuerySchema,

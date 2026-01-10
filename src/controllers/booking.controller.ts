@@ -21,6 +21,9 @@ import userService from "@/services/user.service";
 import { requireAuthUser } from "@/utils/requestGuards";
 import { bookingPaymentListQueryDto } from "@/validators/payment.dto";
 import { serializeBooking } from "@/utils/serialize";
+import { logActivity } from "@/services/activity-log.service";
+import { ActivityEventCodes } from "@/constants/activity-events";
+import { prisma } from "@/config/database";
 
 export const BookingController = {
   // POST /api/bookings
@@ -91,6 +94,20 @@ export const BookingController = {
       }
 
       const dto = serializeBooking(bookingRecord, authUser.userId);
+      if (authUser.role === Role.ADMIN) {
+        await logActivity(prisma, {
+          actorId: authUser.userId,
+          eventCode: ActivityEventCodes.ADMIN_BOOKING_VIEWED,
+          action: "VIEWED",
+          entityType: "BOOKING",
+          entityId: bookingRecord.id,
+          targetUserId: bookingRecord.userId,
+          reqContext: {
+            ipAddress: req.ip,
+            userAgent: req.get("user-agent") ?? undefined,
+          },
+        });
+      }
       createResponse(res, HTTP_STATUS.OK, "Booking retrieved", dto);
     } catch (error) {
       if (error instanceof ZodError) {

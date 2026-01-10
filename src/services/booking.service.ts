@@ -5,12 +5,14 @@ import {
   ItineraryType,
   Prisma,
   TourType,
+  UserRole,
 } from "@prisma/client";
 import { Role } from "@/constants/constants";
 import { prisma } from "@/config/database";
-import { logAudit } from "@/services/activity-log.service";
+import { logActivity, logAudit } from "@/services/activity-log.service";
 import { NotificationService } from "@/services/notification.service";
 import { toISO } from "@/utils/serialize";
+import { ActivityEventCodes } from "@/constants/activity-events";
 
 const BOOKING_CODE_PREFIX = "BV";
 const BOOKING_CODE_PADDING = 3;
@@ -319,17 +321,23 @@ export const BookingService = {
           include: bookingInclude,
         });
 
-        await logAudit(tx, {
-          actorUserId: data.userId,
-          action: "BOOKING_CREATED",
+        await logActivity(tx, {
+          actorId: data.userId,
+          actorRole: data.role === Role.ADMIN ? UserRole.ADMIN : UserRole.USER,
+          eventCode:
+            data.role === Role.ADMIN
+              ? ActivityEventCodes.ADMIN_BOOKING_CREATED
+              : ActivityEventCodes.USER_BOOKING_CREATED,
+          action: "CREATED",
           entityType: "BOOKING",
           entityId: booking.id,
+          targetUserId: data.role === Role.ADMIN ? booking.userId : null,
           metadata: {
             bookingCode: booking.bookingCode,
             destination: booking.destination,
             status: booking.status,
           },
-          message: `Created booking ${booking.id} for ${booking.destination}`,
+          details: `Created booking ${booking.id} for ${booking.destination}`,
         });
 
         await NotificationService.create(
@@ -453,18 +461,24 @@ export const BookingService = {
           include: bookingInclude,
         });
 
-        await logAudit(tx, {
-          actorUserId: data.userId,
-          action: "BOOKING_CREATED",
+        await logActivity(tx, {
+          actorId: data.userId,
+          actorRole: data.role === Role.ADMIN ? UserRole.ADMIN : UserRole.USER,
+          eventCode:
+            data.role === Role.ADMIN
+              ? ActivityEventCodes.ADMIN_BOOKING_CREATED
+              : ActivityEventCodes.USER_BOOKING_CREATED,
+          action: "CREATED",
           entityType: "BOOKING",
           entityId: booking.id,
+          targetUserId: data.role === Role.ADMIN ? booking.userId : null,
           metadata: {
             bookingCode: booking.bookingCode,
             destination: booking.destination,
             status: booking.status,
             tourPackageId: data.tourPackageId,
           },
-          message: `Created STANDARD booking ${booking.id} from tour package ${tourPackage.title}`,
+          details: `Created STANDARD booking ${booking.id} from tour package ${tourPackage.title}`,
         });
 
         await NotificationService.create(
@@ -595,17 +609,23 @@ export const BookingService = {
         },
       });
 
-      await logAudit(tx, {
-        actorUserId: data.userId,
-        action: "BOOKING_CREATED",
+      await logActivity(tx, {
+        actorId: data.userId,
+        actorRole: data.role === Role.ADMIN ? UserRole.ADMIN : UserRole.USER,
+        eventCode:
+          data.role === Role.ADMIN
+            ? ActivityEventCodes.ADMIN_BOOKING_CREATED
+            : ActivityEventCodes.USER_BOOKING_CREATED,
+        action: "CREATED",
         entityType: "BOOKING",
         entityId: booking.id,
+        targetUserId: data.role === Role.ADMIN ? booking.userId : null,
         metadata: {
           bookingCode: booking.bookingCode,
           destination: booking.destination,
           status: booking.status,
         },
-        message: `Created booking ${booking.id} for ${booking.destination}`,
+        details: `Created booking ${booking.id} for ${booking.destination}`,
       });
       await NotificationService.create(
         {
@@ -771,17 +791,18 @@ export const BookingService = {
         },
       });
 
-      await logAudit(tx, {
-        actorUserId: userId,
-        action: "BOOKING_UPDATED",
-        entityType: "BOOKING",
-        entityId: bookingId,
+      await logActivity(tx, {
+        actorId: userId,
+        eventCode: ActivityEventCodes.USER_TRAVEL_PLAN_UPDATED,
+        action: "UPDATED",
+        entityType: "TRAVEL_PLAN",
+        entityId: booking.itineraryId,
         metadata: {
           destination,
           travelers,
           customerUpdated: !!(data.customerName || data.customerEmail || data.customerMobile),
         },
-        message: `Updated itinerary for booking ${bookingId}`,
+        details: `Updated itinerary for booking ${bookingId}`,
       });
 
       return updated;
@@ -834,21 +855,29 @@ export const BookingService = {
       });
 
       if (actorId) {
-        const action =
+        const eventCode =
           status === "CONFIRMED"
-            ? "BOOKING_APPROVED"
+            ? ActivityEventCodes.ADMIN_BOOKING_APPROVED
             : status === "REJECTED"
-              ? "BOOKING_REJECTED"
+              ? ActivityEventCodes.ADMIN_BOOKING_REJECTED
               : status === "COMPLETED"
-                ? "BOOKING_COMPLETED"
-                : "BOOKING_STATUS_UPDATED";
-        await logAudit(tx, {
-          actorUserId: actorId,
-          action,
+                ? ActivityEventCodes.ADMIN_BOOKING_COMPLETED
+                : status === "CANCELLED"
+                  ? ActivityEventCodes.ADMIN_BOOKING_CANCELLED
+                  : ActivityEventCodes.ADMIN_BOOKING_UPDATED;
+        await logActivity(tx, {
+          actorId: actorId,
+          eventCode,
+          action: "UPDATED",
           entityType: "BOOKING",
           entityId: bookingId,
-          metadata: { status },
-          message: `Status set to ${status} for booking ${bookingId}`,
+          targetUserId: booking.userId,
+          metadata: {
+            status,
+            reason: status === "REJECTED" ? reason : undefined,
+            resolution: status === "REJECTED" ? resolution : undefined,
+          },
+          details: `Status set to ${status} for booking ${bookingId}`,
         });
       }
 
@@ -1167,13 +1196,14 @@ export const BookingService = {
         data: { status: "CANCELLED", isResolved: true },
       });
 
-      await logAudit(tx, {
-        actorUserId: userId,
-        action: "BOOKING_CANCELLED",
+      await logActivity(tx, {
+        actorId: userId,
+        eventCode: ActivityEventCodes.USER_BOOKING_CANCELLED,
+        action: "CANCELLED",
         entityType: "BOOKING",
         entityId: bookingId,
         metadata: { status: updated.status },
-        message: `Cancelled booking ${bookingId}`,
+        details: `Cancelled booking ${bookingId}`,
       });
 
       return updated;

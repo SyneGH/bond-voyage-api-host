@@ -7,9 +7,9 @@ import {
   UserRole,
 } from "@prisma/client";
 import { prisma } from "@/config/database";
-import { serializeItinerary, toISO } from "@/utils/serialize";
-import { logAudit } from "@/services/activity-log.service";
-import { serializeVersion } from "@/utils/serialize";
+import { serializeItinerary, serializeVersion, toISO } from "@/utils/serialize";
+import { logActivity, logAudit } from "@/services/activity-log.service";
+import { ActivityEventCodes } from "@/constants/activity-events";
 
 interface UpsertItineraryInput {
   userId?: string;
@@ -167,13 +167,14 @@ export const ItineraryService = {
         },
       });
 
-      await logAudit(tx, {
-        actorUserId: data.userId,
-        action: "ITINERARY_CREATED",
-        entityType: "ITINERARY",
+      await logActivity(tx, {
+        actorId: data.userId,
+        eventCode: ActivityEventCodes.USER_TRAVEL_PLAN_CREATED,
+        action: "CREATED",
+        entityType: "TRAVEL_PLAN",
         entityId: created.id,
         metadata: { destination: data.destination },
-        message: `Created itinerary ${created.id}`,
+        details: `Created itinerary ${created.id}`,
       });
 
       return created;
@@ -309,13 +310,14 @@ export const ItineraryService = {
         },
       });
 
-      await logAudit(tx, {
-        actorUserId: userId,
-        action: "ITINERARY_UPDATED",
-        entityType: "ITINERARY",
+      await logActivity(tx, {
+        actorId: userId,
+        eventCode: ActivityEventCodes.USER_TRAVEL_PLAN_UPDATED,
+        action: "UPDATED",
+        entityType: "TRAVEL_PLAN",
         entityId: id,
         metadata: { destination, travelers },
-        message: `Updated itinerary ${id}`,
+        details: `Updated itinerary ${id}`,
       });
 
       return serializeItinerary(updated);
@@ -334,6 +336,14 @@ export const ItineraryService = {
       where: { id },
       data: { status: ItineraryStatus.ARCHIVED },
       include: itineraryIncludes,
+    });
+    await logActivity(prisma, {
+      actorId: userId,
+      eventCode: ActivityEventCodes.USER_TRAVEL_PLAN_DELETED,
+      action: "DELETED",
+      entityType: "TRAVEL_PLAN",
+      entityId: id,
+      details: `Archived itinerary ${id}`,
     });
     return serializeItinerary(updated);
   },
@@ -359,12 +369,14 @@ export const ItineraryService = {
       include: itineraryIncludes,
     });
 
-    await logAudit(prisma, {
-      actorUserId: userId,
-      action: "ITINERARY_SENT",
-      entityType: "ITINERARY",
+    await logActivity(prisma, {
+      actorId: userId,
+      eventCode: ActivityEventCodes.USER_ITINERARY_SHARED,
+      action: "SENT",
+      entityType: "TRAVEL_PLAN",
       entityId: id,
-      message: `Sent itinerary ${id}`,
+      metadata: { recipient: "ADMIN" },
+      details: `Sent itinerary ${id}`,
     });
     return serializeItinerary(updated);
   },
@@ -416,13 +428,14 @@ export const ItineraryService = {
         update: {},
         create: { itineraryId: id, userId: collaboratorId, invitedById: ownerId },
       });
-      await logAudit(tx, {
-        actorUserId: ownerId,
-        action: "ITINERARY_COLLABORATOR_ADDED",
-        entityType: "ITINERARY",
+      await logActivity(tx, {
+        actorId: ownerId,
+        eventCode: ActivityEventCodes.USER_TRAVEL_PLAN_COLLABORATOR_ADDED,
+        action: "ADDED",
+        entityType: "TRAVEL_PLAN",
         entityId: id,
         metadata: { collaboratorId },
-        message: `Added collaborator ${collaboratorId} to itinerary ${id}`,
+        details: `Added collaborator ${collaboratorId} to itinerary ${id}`,
       });
       return collab;
     });
@@ -432,13 +445,14 @@ export const ItineraryService = {
     const removed = await prisma.itineraryCollaborator.deleteMany({
       where: { itineraryId: id, userId: collaboratorId, itinerary: { userId: ownerId } },
     });
-    await logAudit(prisma, {
-      actorUserId: ownerId,
-      action: "ITINERARY_COLLABORATOR_REMOVED",
-      entityType: "ITINERARY",
+    await logActivity(prisma, {
+      actorId: ownerId,
+      eventCode: ActivityEventCodes.USER_TRAVEL_PLAN_COLLABORATOR_REMOVED,
+      action: "REMOVED",
+      entityType: "TRAVEL_PLAN",
       entityId: id,
       metadata: { collaboratorId },
-      message: `Removed collaborator ${collaboratorId} from itinerary ${id}`,
+      details: `Removed collaborator ${collaboratorId} from itinerary ${id}`,
     });
     return removed;
   },
