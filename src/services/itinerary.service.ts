@@ -23,6 +23,7 @@ interface UpsertItineraryInput {
   tourType?: TourType;
   days?: {
     dayNumber: number;
+    title?: string | null;
     date?: Date | null;
     activities: {
       time: string;
@@ -148,6 +149,7 @@ export const ItineraryService = {
             ? {
                 create: data.days.map((day) => ({
                   dayNumber: day.dayNumber,
+                  title: day.title ?? null,
 
                   date: day.date ? new Date(day.date) : undefined,
                   activities: { create: day.activities },
@@ -286,6 +288,7 @@ export const ItineraryService = {
             data: {
               itineraryId: id,
               dayNumber: day.dayNumber,
+              title: day.title ?? null,
               date: day.date ?? undefined,
               activities: { create: day.activities },
             },

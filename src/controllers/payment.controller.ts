@@ -2,7 +2,7 @@ import { Response } from "express";
 import { ZodError } from "zod";
 import { PaymentService } from "@/services/payment.service";
 import { AuthenticatedRequest } from "@/types";
-import { bookingIdParamDto } from "@/validators/booking.dto";
+import { bookingIdAliasParamDto, bookingIdParamDto } from "@/validators/booking.dto";
 import {
   createPaymentDto,
   paymentIdParamDto,
@@ -17,8 +17,9 @@ export const PaymentController = {
   create: async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
       const authUser = requireAuthUser(req);
-
-      const { id: bookingId } = bookingIdParamDto.parse(req.params);
+      const bookingId = req.params.bookingId
+        ? bookingIdAliasParamDto.parse(req.params).bookingId
+        : bookingIdParamDto.parse(req.params).id;
       const payload = createPaymentDto.parse(req.body);
 
       let proofImage: Buffer | undefined;

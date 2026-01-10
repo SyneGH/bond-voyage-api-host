@@ -32,6 +32,8 @@ export const BookingController = {
 
       const booking = await BookingService.createBooking({
         ...payload,
+        userBudget:
+          payload.userBudget === undefined ? payload.budget : payload.userBudget,
         userId: authUser.userId,
         role: authUser.role,
       });
@@ -50,6 +52,12 @@ export const BookingController = {
       }
       if (error instanceof Error && error.message === "ITINERARY_FORBIDDEN") {
         throwError(HTTP_STATUS.FORBIDDEN, "Forbidden");
+      }
+      if (error instanceof Error && error.message === "ITINERARY_NOT_CONFIRMED") {
+        throwError(
+          HTTP_STATUS.CONFLICT,
+          "Requested itinerary must be confirmed before booking"
+        );
       }
       if (error instanceof AppError) {
         throw error;
@@ -418,6 +426,12 @@ export const BookingController = {
       }
       if (error?.message === "CANNOT_SUBMIT") {
         throwError(HTTP_STATUS.CONFLICT, "Only drafts can be submitted");
+      }
+      if (error?.message === "BOOKING_ACTIVITIES_REQUIRED") {
+        throwError(
+          HTTP_STATUS.BAD_REQUEST,
+          "Activities are required before submitting a booking"
+        );
       }
       if (error?.message === "BOOKING_NOT_FOUND") {
         throwError(HTTP_STATUS.NOT_FOUND, "Booking not found");

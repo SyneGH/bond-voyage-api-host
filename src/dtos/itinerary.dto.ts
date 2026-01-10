@@ -13,6 +13,7 @@ export interface ActivityDTO {
 export interface ItineraryDayDTO {
   id: string;
   dayNumber: number;
+  title?: string | null;
   date: string | null;
   activities: ActivityDTO[];
 }

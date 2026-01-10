@@ -34,6 +34,8 @@ export const createTourPackageDto = z.object({
   price: z.number().min(0),
   duration: z.number().int().min(1),
   thumbUrl: z.string().url().optional().nullable(),
+  imageUrl: z.string().url().optional().nullable(),
+  image: z.string().url().optional().nullable(),
   isActive: z.boolean().optional(),
   days: z.array(dayDto).optional(),
 });
