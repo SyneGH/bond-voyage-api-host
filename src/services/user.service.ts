@@ -3,7 +3,8 @@ import { User, Prisma } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { BCRYPT_SALT_ROUNDS } from "@/constants/constants";
 import { RegisterDto, UserUpdateDto } from "@/types";
-import { logAudit } from "./activity-log.service";
+import { logActivity, logAudit } from "./activity-log.service";
+import { ActivityEventCodes } from "@/constants/activity-events";
 
 // Define the shape of the query object based on your DTO
 interface UserQuery {
@@ -93,13 +94,15 @@ export class UserService {
     data: RegisterDto
   ): Promise<User> {
     const user = await this.create(data);
-    await logAudit(prisma, {
-      actorUserId: actorId,
-      action: "USER_CREATED",
+    await logActivity(prisma, {
+      actorId,
+      eventCode: ActivityEventCodes.ADMIN_USER_CREATED,
+      action: "CREATED",
       entityType: "USER",
       entityId: user.id,
+      targetUserId: user.id,
       metadata: { email: user.email },
-      message: `Created user ${user.email}`,
+      details: `Created user ${user.email}`,
     });
     return user;
   }
@@ -191,13 +194,26 @@ export class UserService {
   ): Promise<User | null> {
     const user = await this.updateById(id, data);
     if (user) {
-      await logAudit(prisma, {
-        actorUserId: actorId,
-        action: "USER_UPDATED",
-        entityType: "USER",
-        entityId: id,
-        message: `Updated user ${id}`,
-      });
+      if (data.role) {
+        await logActivity(prisma, {
+          actorId,
+          eventCode: ActivityEventCodes.ADMIN_USER_ROLE_UPDATED,
+          action: "UPDATED",
+          entityType: "USER",
+          entityId: id,
+          targetUserId: id,
+          metadata: { role: data.role },
+          details: `Updated user role ${id}`,
+        });
+      } else {
+        await logAudit(prisma, {
+          actorUserId: actorId,
+          action: "USER_UPDATED",
+          entityType: "USER",
+          entityId: id,
+          message: `Updated user ${id}`,
+        });
+      }
     }
     return user;
   }
@@ -215,12 +231,13 @@ export class UserService {
   ): Promise<User | null> {
     const user = await this.updateProfile(userId, data);
     if (user) {
-      await logAudit(prisma, {
-        actorUserId: userId,
-        action: "USER_PROFILE_UPDATED",
+      await logActivity(prisma, {
+        actorId: userId,
+        eventCode: ActivityEventCodes.USER_PROFILE_UPDATED,
+        action: "UPDATED",
         entityType: "USER",
         entityId: userId,
-        message: `Updated profile for user ${userId}`,
+        details: `Updated profile for user ${userId}`,
       });
     }
     return user;
@@ -288,12 +305,14 @@ export class UserService {
 
   async deactivateWithLog(actorId: string, id: string): Promise<User> {
     const user = await this.deactivate(id);
-    await logAudit(prisma, {
-      actorUserId: actorId,
-      action: "USER_DEACTIVATED",
+    await logActivity(prisma, {
+      actorId,
+      eventCode: ActivityEventCodes.ADMIN_USER_SUSPENDED,
+      action: "SUSPENDED",
       entityType: "USER",
       entityId: id,
-      message: `Deactivated user ${id}`,
+      targetUserId: id,
+      details: `Deactivated user ${id}`,
     });
     return user;
   }
@@ -306,12 +325,14 @@ export class UserService {
 
   async deleteWithLog(actorId: string, id: string): Promise<User> {
     const user = await this.delete(id);
-    await logAudit(prisma, {
-      actorUserId: actorId,
-      action: "USER_DELETED",
+    await logActivity(prisma, {
+      actorId,
+      eventCode: ActivityEventCodes.ADMIN_USER_DELETED,
+      action: "DELETED",
       entityType: "USER",
       entityId: id,
-      message: `Deleted user ${id}`,
+      targetUserId: id,
+      details: `Deleted user ${id}`,
     });
     return user;
   }
