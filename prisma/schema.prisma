@@ -295,6 +295,7 @@ model Booking {
   bookedDate     DateTime @default(now())
 
   totalPrice Decimal @db.Decimal(10, 2)
+  userBudget Decimal? @db.Decimal(10, 2)
 
   type     BookingType   @default(CUSTOMIZED)
   status   BookingStatus @default(PENDING)

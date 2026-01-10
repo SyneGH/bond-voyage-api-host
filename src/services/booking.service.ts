@@ -145,6 +145,7 @@ interface CreateBookingDTO {
   preferences?: string[];
   itineraryData?: SmartTripDayInput[];
   totalPrice: number;
+  userBudget?: number;
   type?: BookingType;
   tourType?: TourType;
 
@@ -177,6 +178,7 @@ interface InlineItineraryDTO {
   tourType?: TourType;
   days?: {
     dayNumber: number;
+    title?: string | null;
     date?: Date | null;
     activities: {
       time: string;
@@ -198,6 +200,7 @@ interface UpdateBookingItineraryDTO {
   endDate: Date;
   travelers: number;
   totalPrice: number;
+  userBudget?: number;
   version: number;
   itinerary: {
     dayNumber: number;
@@ -309,6 +312,10 @@ export const BookingService = {
             endDate: endDate ?? undefined,
             travelers: data.travelers ?? 1,
             totalPrice: data.totalPrice as unknown as Prisma.Decimal,
+            userBudget:
+              data.userBudget !== undefined
+                ? (data.userBudget as unknown as Prisma.Decimal)
+                : undefined,
             type: data.type ?? BookingType.CUSTOMIZED,
             tourType: data.tourType ?? TourType.PRIVATE,
             status: BookingStatus.DRAFT,
@@ -443,6 +450,10 @@ export const BookingService = {
             endDate: endDate ?? undefined,
             travelers: data.travelers ?? 1,
             totalPrice: data.totalPrice as unknown as Prisma.Decimal,
+            userBudget:
+              data.userBudget !== undefined
+                ? (data.userBudget as unknown as Prisma.Decimal)
+                : undefined,
             type: BookingType.STANDARD,
             tourType: data.tourType ?? TourType.PRIVATE,
             status: BookingStatus.DRAFT,
@@ -520,7 +531,7 @@ export const BookingService = {
                 ? {
                     create: data.itinerary.days.map((day) => ({
                       dayNumber: day.dayNumber,
-
+                      title: day.title ?? null,
                       date: day.date ? new Date(day.date) : undefined,
                       activities: { create: day.activities },
                     })),
@@ -562,6 +573,14 @@ export const BookingService = {
         throw new Error("ITINERARY_FORBIDDEN");
       }
 
+      if (
+        data.itineraryId &&
+        itinerary.type === ItineraryType.REQUESTED &&
+        itinerary.requestedStatus !== "CONFIRMED"
+      ) {
+        throw new Error("ITINERARY_NOT_CONFIRMED");
+      }
+
       const bookingCode = await generateBookingCode(tx);
 
       // ✅ CORRECT FIX: Use undefined fallback to match Prisma's optional fields
@@ -576,6 +595,10 @@ export const BookingService = {
           travelers: itinerary.travelers,
 
           totalPrice: data.totalPrice as unknown as Prisma.Decimal,
+          userBudget:
+            data.userBudget !== undefined
+              ? (data.userBudget as unknown as Prisma.Decimal)
+              : undefined,
           type: data.type ?? (itinerary.type as BookingType),
           tourType: data.tourType ?? itinerary.tourType ?? TourType.PRIVATE,
           status: BookingStatus.DRAFT,
@@ -764,6 +787,9 @@ export const BookingService = {
           travelers: data.travelers,
           totalPrice: data.totalPrice as unknown as Prisma.Decimal,
           isResolved: false,
+          ...(data.userBudget !== undefined && {
+            userBudget: data.userBudget as unknown as Prisma.Decimal,
+          }),
 
           ...(data.customerName !== undefined && { customerName: data.customerName }),
           ...(data.customerEmail !== undefined && { customerEmail: data.customerEmail }),
@@ -1102,12 +1128,32 @@ export const BookingService = {
 
       const booking = await tx.booking.findFirst({
         where: { id: bookingId, userId },
-        select: { id: true, status: true, bookingCode: true },
+        select: {
+          id: true,
+          status: true,
+          bookingCode: true,
+          itinerary: {
+            select: {
+              days: {
+                select: {
+                  activities: { select: { id: true } },
+                },
+              },
+            },
+          },
+        },
       });
 
       if (!booking) throw new Error("BOOKING_NOT_FOUND");
       if (!["DRAFT", "REJECTED"].includes(booking.status)) {
         throw new Error("CANNOT_SUBMIT");
+      }
+
+      const days = booking.itinerary?.days ?? [];
+      const hasEmptyActivities =
+        days.length === 0 || days.some((day) => day.activities.length === 0);
+      if (hasEmptyActivities) {
+        throw new Error("BOOKING_ACTIVITIES_REQUIRED");
       }
 
       const updated = await tx.booking.update({

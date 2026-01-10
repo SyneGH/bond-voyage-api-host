@@ -87,6 +87,7 @@ export const serializeItinerary = (itinerary?: SerializedItineraryInput | null):
       itinerary.days?.map((day) => ({
         id: day.id,
         dayNumber: day.dayNumber,
+        title: day.title ?? null,
         date: toISO(day.date),
         activities:
           day.activities?.map((activity) => ({
@@ -139,6 +140,7 @@ export const serializeBooking = (
     dateRangeDisplay: formatDateRange(booking.startDate, booking.endDate),
     travelers: booking.travelers ?? null,
     totalPrice: decimalToNumber(booking.totalPrice),
+    userBudget: decimalToNumber(booking.userBudget),
     type: booking.type,
     status: booking.status,
     tourType: booking.tourType,

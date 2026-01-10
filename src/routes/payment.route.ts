@@ -14,6 +14,12 @@ router.get(
 );
 
 router.post(
+  "/booking/:bookingId",
+  authenticate,
+  asyncHandler(PaymentController.create)
+);
+
+router.post(
   "/:id",
   authenticate,
   asyncHandler(PaymentController.create)

@@ -20,8 +20,9 @@ const activityDto = z.object({
 
 const dayDto = z.object({
   dayNumber: z.number().int().min(1),
+  title: z.string().optional().nullable(),
   date: dateSchema,
-  activities: z.array(activityDto).min(1),
+  activities: z.array(activityDto).min(0),
 });
 
 const versionNumberSchema = z.preprocess((val) => {

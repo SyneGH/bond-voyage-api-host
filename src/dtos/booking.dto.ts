@@ -18,6 +18,7 @@ export interface BookingDTO {
   dateRangeDisplay?: string | null;
   travelers: number | null;
   totalPrice: number | null;
+  userBudget: number | null;
   type: BookingType;
   status: BookingStatus;
   tourType: TourType;

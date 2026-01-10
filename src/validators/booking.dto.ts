@@ -48,7 +48,7 @@ const itineraryDayDto = z.object({
   dayNumber: z.number().int().min(1),
   title: z.string().optional().nullable(),
   date: dateSchema.optional().nullable(),
-  activities: z.array(activityDto).min(1),
+  activities: z.array(activityDto).min(0),
 });
 
 const versionNumberSchema = z.preprocess((val) => {
@@ -76,9 +76,9 @@ const inlineItineraryDto = z
 
 export const createBookingDto = z
   .object({
-    customerName: z.string().min(1, "Customer name is required"),
-    customerEmail: z.string().email("Invalid email address"),
-    customerMobile: z.string().min(1, "Customer mobile number is required"),
+    customerName: z.string().min(1, "Customer name is required").optional(),
+    customerEmail: z.string().email("Invalid email address").optional(),
+    customerMobile: z.string().min(1, "Customer mobile number is required").optional(),
 
     itineraryId: z.string().uuid().optional(),
     tourPackageId: z.string().uuid().optional(),
@@ -95,6 +95,7 @@ export const createBookingDto = z
     endDate: z.string().optional(),
     travelers: z.number().int().min(1).optional(),
     budget: z.number().min(0).optional(),
+    userBudget: z.number().min(0).optional(),
     travelPace: z.enum(["relaxed", "moderate", "packed", "own_pace"]).optional(),
     preferences: z.array(z.string().min(1).max(40)).max(10).optional(),
     itineraryData: smartTripItineraryDataDto.optional(),
@@ -111,6 +112,33 @@ export const createBookingDto = z
         path: ["itineraryId"],
       });
       return;
+    }
+
+    const requiresCustomer =
+      data.type === "STANDARD" || Boolean(data.tourPackageId);
+
+    if (requiresCustomer) {
+      if (!data.customerName) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Customer name is required",
+          path: ["customerName"],
+        });
+      }
+      if (!data.customerEmail) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Customer email is required",
+          path: ["customerEmail"],
+        });
+      }
+      if (!data.customerMobile) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Customer mobile number is required",
+          path: ["customerMobile"],
+        });
+      }
     }
 
     if (!isSmartTrip) return;
@@ -148,7 +176,8 @@ export const updateItineraryDto = z
     endDate: dateSchema,
     travelers: z.number().int().min(1),
     totalPrice: z.number().min(0),
-    itinerary: z.array(itineraryDayDto).min(1),
+    userBudget: z.number().min(0).optional(),
+    itinerary: z.array(itineraryDayDto).min(0),
     version: versionNumberSchema,
   })
   .refine((data) => data.endDate >= data.startDate, {
@@ -190,6 +219,10 @@ export const updateStatusDto = z
 
 export const bookingIdParamDto = z.object({
   id: z.string().uuid(),
+});
+
+export const bookingIdAliasParamDto = z.object({
+  bookingId: z.string().uuid(),
 });
 
 export const collaboratorUserIdParamDto = z.object({
