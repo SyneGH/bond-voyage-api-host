@@ -5,7 +5,8 @@ import { User, UserRole } from "@prisma/client";
 import userService from "@/services/user.service";
 import { throwError } from "@/utils/responseHandler";
 import { HTTP_STATUS } from "@/constants/constants";
-import { logAudit } from "@/services/activity-log.service";
+import { logActivity, logAudit } from "@/services/activity-log.service";
+import { ActivityEventCodes } from "@/constants/activity-events";
 
 interface RegisterInput {
   email: string;
@@ -79,7 +80,8 @@ export class AuthService {
 
   async login(
     email: string,
-    password: string
+    password: string,
+    reqContext?: { ipAddress?: string; userAgent?: string }
   ): Promise<{ user: User; accessToken: string; refreshToken: string }> {
     const user = await prisma.user.findUnique({ where: { email } });
 
@@ -128,17 +130,22 @@ export class AuthService {
       },
     });
 
-    await logAudit(prisma, {
-      actorUserId: authUser.id,
-      action: "AUTH_LOGIN",
+    await logActivity(prisma, {
+      actorId: authUser.id,
+      actorRole: authUser.role,
+      eventCode:
+        authUser.role === UserRole.ADMIN
+          ? ActivityEventCodes.ADMIN_LOGIN
+          : ActivityEventCodes.USER_LOGIN,
       entityType: "AUTH",
-      metadata: { 
-        email: authUser.email,
+      entityId: authUser.id,
+      metadata: {
         sessionReplaced: hadExistingSessions,
       },
-      message: hadExistingSessions 
+      details: hadExistingSessions
         ? "User login successful - previous session invalidated"
         : "User login successful",
+      reqContext,
     });
 
     return { user: authUser, accessToken, refreshToken };

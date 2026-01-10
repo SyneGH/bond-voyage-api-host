@@ -1,7 +1,8 @@
 import { prisma } from "@/config/database";
 import { InquiryStatus } from "@prisma/client";
-import { logAudit } from "@/services/activity-log.service";
+import { logActivity, logAudit } from "@/services/activity-log.service";
 import { NotificationService } from "@/services/notification.service";
+import { ActivityEventCodes } from "@/constants/activity-events";
 
 export const InquiryService = {
   async createInquiry(
@@ -55,13 +56,16 @@ export const InquiryService = {
         },
       });
 
-      await logAudit(tx, {
-        actorUserId: userId,
-        action: "INQUIRY_CREATED",
+      await logActivity(tx, {
+        actorId: userId,
+        eventCode: bookingId
+          ? ActivityEventCodes.USER_INQUIRY_SUBMITTED
+          : ActivityEventCodes.USER_INQUIRY_CREATED,
+        action: "CREATED",
         entityType: "INQUIRY",
         entityId: inquiry.id,
         metadata: { bookingId: inquiry.bookingId ?? undefined },
-        message: `Created inquiry ${inquiry.id}`,
+        details: `Created inquiry ${inquiry.id}`,
       });
 
       return inquiry;
@@ -126,14 +130,26 @@ export const InquiryService = {
       },
     });
 
-    await logAudit(prisma, {
-      actorUserId: senderId,
-      action: "INQUIRY_MESSAGE_SENT",
-      entityType: "INQUIRY",
-      entityId: inquiryId,
-      metadata: { isAdmin },
-      message: `Sent inquiry message for inquiry ${inquiryId}`,
-    });
+    if (!isAdmin) {
+      await logActivity(prisma, {
+        actorId: senderId,
+        eventCode: ActivityEventCodes.USER_SUPPORT_REPLIED,
+        action: "REPLIED",
+        entityType: "INQUIRY",
+        entityId: inquiryId,
+        metadata: { isAdmin },
+        details: `Sent inquiry message for inquiry ${inquiryId}`,
+      });
+    } else {
+      await logAudit(prisma, {
+        actorUserId: senderId,
+        action: "INQUIRY_MESSAGE_SENT",
+        entityType: "INQUIRY",
+        entityId: inquiryId,
+        metadata: { isAdmin },
+        message: `Sent inquiry message for inquiry ${inquiryId}`,
+      });
+    }
 
     if (isAdmin) {
       await NotificationService.create({

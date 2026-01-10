@@ -128,7 +128,8 @@ model User {
   invitedCollaborations ItineraryCollaborator[] @relation("itinerary_invites")
   feedback              Feedback[]
   respondedFeedback     Feedback[]              @relation("feedback_responses")
-  activityLogs          ActivityLog[]
+  activityLogs          ActivityLog[]          @relation("activity_logs_actor")
+  targetedActivityLogs  ActivityLog[]          @relation("activity_logs_target")
   inquiries             Inquiry[]
   messages              Message[]
   notifications         Notification[]
@@ -398,14 +399,24 @@ model Feedback {
 }
 
 model ActivityLog {
-  id     String @id @default(uuid())
-  userId String
-  user   User   @relation(fields: [userId], references: [id])
+  id          String   @id @default(uuid())
+  actorId     String   @map("userId")
+  actor       User     @relation("activity_logs_actor", fields: [actorId], references: [id])
+  actorRole   UserRole @default(USER)
 
-  action  String
-  details String?
+  eventCode   String
+  action      String
+  entityType  String?
+  entityId    String?
+  targetUserId String?
+  targetUser  User?    @relation("activity_logs_target", fields: [targetUserId], references: [id])
 
-  timestamp DateTime @default(now())
+  metadata   Json?
+  ipAddress  String?
+  userAgent  String?
+  details    String?
+
+  createdAt DateTime @default(now()) @map("timestamp")
 
   @@map("activity_logs")
 }
