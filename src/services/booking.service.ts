@@ -1419,10 +1419,11 @@ export const BookingService = {
       });
 
       if (!booking) throw new Error("BOOKING_NOT_FOUND");
-      if (booking.type === BookingType.REQUESTED && !isAdmin) {
-        throw new Error("BOOKING_FORBIDDEN");
-      }
-      if (booking.type === BookingType.REQUESTED && isAdmin) {
+      if (booking.type === BookingType.REQUESTED) {
+        const canSendRequested = isAdmin || booking.itinerary?.userId === userId;
+        if (!canSendRequested) {
+          throw new Error("BOOKING_FORBIDDEN");
+        }
         const requestedStatus = booking.itinerary?.requestedStatus;
         if (!booking.itinerary?.id) {
           throw new Error("ITINERARY_NOT_FOUND");
