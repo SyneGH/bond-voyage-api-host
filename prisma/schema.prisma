@@ -38,6 +38,7 @@ enum RequestStatus {
   DRAFT
   SENT
   CONFIRMED
+  CANCELLED
 }
 
 enum BookingType {
@@ -304,6 +305,9 @@ model Booking {
   // Payment Visibility (requested for "get my bookings")
   paymentStatus     PaymentStatus @default(PENDING) //
   paymentReceiptUrl String? // URL to uploaded GCash/Receipt image
+
+  requestedSourceBookingId String?
+  requestedBookedAt DateTime?
 
   rejectionReason     String?
   rejectionResolution String?

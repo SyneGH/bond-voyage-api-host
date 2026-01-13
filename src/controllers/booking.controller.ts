@@ -35,6 +35,7 @@ export const BookingController = {
         userBudget:
           payload.userBudget === undefined ? payload.budget : payload.userBudget,
         userId: authUser.userId,
+        targetUserId: payload.userId,
         role: authUser.role,
       });
       const dto = serializeBooking(booking, authUser.userId);
@@ -58,6 +59,9 @@ export const BookingController = {
           HTTP_STATUS.CONFLICT,
           "Requested itinerary must be confirmed before booking"
         );
+      }
+      if (error instanceof Error && error.message === "TARGET_USER_NOT_FOUND") {
+        throwError(HTTP_STATUS.NOT_FOUND, "Target user not found");
       }
       if (error instanceof AppError) {
         throw error;
@@ -420,7 +424,11 @@ export const BookingController = {
       const authUser = requireAuthUser(req);
 
       const { id } = bookingIdParamDto.parse(req.params);
-      const updated = await BookingService.submitBooking(id, authUser.userId);
+      const updated = await BookingService.submitBooking(
+        id,
+        authUser.userId,
+        authUser.role
+      );
       createResponse(res, HTTP_STATUS.OK, "Booking submitted", updated);
     } catch (error: any) {
       if (error instanceof ZodError) {
@@ -432,12 +440,21 @@ export const BookingController = {
       if (error?.message === "CANNOT_SUBMIT") {
         throwError(HTTP_STATUS.CONFLICT, "Only drafts can be submitted");
       }
+      if (error?.message === "CANNOT_SEND_CANCELLED") {
+        throwError(HTTP_STATUS.CONFLICT, "Cancelled requested itinerary cannot be sent");
+      }
+      if (error?.message === "BOOKING_FORBIDDEN") {
+        throwError(HTTP_STATUS.FORBIDDEN, "Forbidden");
+      }
       if (error?.message === "BOOKING_ACTIVITIES_REQUIRED") {
         throwError(
           HTTP_STATUS.BAD_REQUEST,
           "Activities are required before submitting a booking"
         );
       }
+      if (error?.message === "ITINERARY_NOT_FOUND") {
+        throwError(HTTP_STATUS.NOT_FOUND, "Itinerary not found");
+      }      
       if (error?.message === "BOOKING_NOT_FOUND") {
         throwError(HTTP_STATUS.NOT_FOUND, "Booking not found");
       }
@@ -467,8 +484,128 @@ export const BookingController = {
       if (error?.message === "CANNOT_CANCEL") {
         throwError(HTTP_STATUS.CONFLICT, "Booking cannot be cancelled");
       }
+      if (error?.message === "BOOKING_FORBIDDEN") {
+        throwError(HTTP_STATUS.FORBIDDEN, "Forbidden");
+      }
       if (error?.message === "BOOKING_NOT_FOUND") {
         throwError(HTTP_STATUS.NOT_FOUND, "Booking not found");
+      }
+      throwError(
+        HTTP_STATUS.INTERNAL_SERVER_ERROR,
+        "Internal Server Error",
+        error
+      );
+    }
+  },
+
+  // PATCH /api/bookings/:id/confirm (Requested)
+  confirm: async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const authUser = requireAuthUser(req);
+      const { id } = bookingIdParamDto.parse(req.params);
+      const updated = await BookingService.confirmRequestedBooking(
+        id,
+        authUser.userId
+      );
+      createResponse(res, HTTP_STATUS.OK, "Booking confirmed", updated);
+    } catch (error: any) {
+      if (error instanceof ZodError) {
+        throwError(HTTP_STATUS.BAD_REQUEST, "Validation failed", error.errors);
+      }
+      if (error?.message === "BOOKING_NOT_FOUND") {
+        throwError(HTTP_STATUS.NOT_FOUND, "Booking not found");
+      }
+      if (error?.message === "BOOKING_FORBIDDEN") {
+        throwError(HTTP_STATUS.FORBIDDEN, "Forbidden");
+      }
+      if (error?.message === "CANNOT_CONFIRM") {
+        throwError(HTTP_STATUS.CONFLICT, "Requested itinerary cannot be confirmed");
+      }
+      if (error?.message === "NOT_REQUESTED") {
+        throwError(HTTP_STATUS.CONFLICT, "Only requested itineraries can be confirmed");
+      }
+      if (error instanceof AppError) {
+        throw error;
+      }
+      throwError(
+        HTTP_STATUS.INTERNAL_SERVER_ERROR,
+        "Internal Server Error",
+        error
+      );
+    }
+  },
+
+  // POST /api/bookings/:id/book-requested (Admin)
+  bookRequested: async (
+    req: AuthenticatedRequest,
+    res: Response
+  ): Promise<void> => {
+    try {
+      const authUser = requireAuthUser(req);
+      const { id } = bookingIdParamDto.parse(req.params);
+      const booked = await BookingService.bookFromRequested(id, authUser.userId);
+      createResponse(res, HTTP_STATUS.CREATED, "Requested itinerary booked", booked);
+    } catch (error: any) {
+      if (error instanceof ZodError) {
+        throwError(HTTP_STATUS.BAD_REQUEST, "Validation failed", error.errors);
+      }
+      if (error?.message === "BOOKING_NOT_FOUND") {
+        throwError(HTTP_STATUS.NOT_FOUND, "Booking not found");
+      }
+      if (error?.message === "REQUESTED_NOT_CONFIRMED") {
+        throwError(
+          HTTP_STATUS.CONFLICT,
+          "Requested itinerary must be confirmed before booking"
+        );
+      }
+      if (error?.message === "REQUESTED_CANCELLED") {
+        throwError(HTTP_STATUS.CONFLICT, "Requested itinerary was cancelled");
+      }
+      if (error?.message === "NOT_REQUESTED") {
+        throwError(HTTP_STATUS.CONFLICT, "Only requested itineraries can be booked");
+      }
+      if (error instanceof AppError) {
+        throw error;
+      }
+      throwError(
+        HTTP_STATUS.INTERNAL_SERVER_ERROR,
+        "Internal Server Error",
+        error
+      );
+    }
+  },
+
+  // POST /api/bookings/:id/move-to-requested (Admin)
+  moveToRequested: async (
+    req: AuthenticatedRequest,
+    res: Response
+  ): Promise<void> => {
+    try {
+      const authUser = requireAuthUser(req);
+      const { id } = bookingIdParamDto.parse(req.params);
+      const updated = await BookingService.moveBookedToRequested(
+        id,
+        authUser.userId
+      );
+      createResponse(res, HTTP_STATUS.OK, "Booking moved to requested", updated);
+    } catch (error: any) {
+      if (error instanceof ZodError) {
+        throwError(HTTP_STATUS.BAD_REQUEST, "Validation failed", error.errors);
+      }
+      if (error?.message === "BOOKING_NOT_FOUND") {
+        throwError(HTTP_STATUS.NOT_FOUND, "Booking not found");
+      }
+      if (error?.message === "NOT_REQUESTED_ORIGIN") {
+        throwError(HTTP_STATUS.CONFLICT, "Booking is not from requested flow");
+      }
+      if (error?.message === "BOOKING_PAID") {
+        throwError(HTTP_STATUS.CONFLICT, "Booking has payments");
+      }
+      if (error?.message === "BOOKING_ALREADY_STARTED") {
+        throwError(HTTP_STATUS.CONFLICT, "Booking has already started");
+      }
+      if (error instanceof AppError) {
+        throw error;
       }
       throwError(
         HTTP_STATUS.INTERNAL_SERVER_ERROR,

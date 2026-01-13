@@ -132,6 +132,7 @@ const generateBookingCode = async (tx: Prisma.TransactionClient) => {
 interface CreateBookingDTO {
   userId: string;
   role: string;
+  targetUserId?: string;
   itineraryId?: string;
   tourPackageId?: string;
   itinerary?: InlineItineraryDTO;
@@ -355,6 +356,32 @@ export const BookingService = {
         },
       } as const;
 
+      const isRequested =
+        data.type === BookingType.REQUESTED ||
+        data.itinerary?.type === ItineraryType.REQUESTED;
+      const canTargetUser =
+        isRequested &&
+        data.role === Role.ADMIN &&
+        data.targetUserId &&
+        data.targetUserId !== data.userId;
+      const resolvedTargetUserId = canTargetUser ? data.targetUserId! : data.userId;
+      const targetUser = canTargetUser
+        ? await tx.user.findUnique({
+            where: { id: resolvedTargetUserId },
+            select: { id: true, firstName: true, lastName: true, email: true, mobile: true },
+          })
+        : null;
+      if (canTargetUser && !targetUser) {
+        throw new Error("TARGET_USER_NOT_FOUND");
+      }
+      const targetName = targetUser
+        ? `${targetUser.firstName ?? ""} ${targetUser.lastName ?? ""}`.trim()
+        : undefined;
+      const resolvedCustomerName =
+        targetUser && targetName ? targetName : data.customerName;
+      const resolvedCustomerEmail = targetUser?.email ?? data.customerEmail;
+      const resolvedCustomerMobile = targetUser?.mobile ?? data.customerMobile;
+
       const isSmartTrip =
         data.itineraryType === ItineraryType.SMART_TRIP || data.itineraryData;
 
@@ -431,7 +458,7 @@ export const BookingService = {
         const booking = await tx.booking.create({
           data: {
             bookingCode,
-            userId: data.userId,
+            userId: isRequested ? resolvedTargetUserId : data.userId,
             itineraryId: itinerary.id,
             destination: itinerary.destination,
             startDate: startDate ?? undefined,
@@ -442,12 +469,12 @@ export const BookingService = {
               data.userBudget !== undefined
                 ? (data.userBudget as unknown as Prisma.Decimal)
                 : undefined,
-            type: data.type ?? BookingType.CUSTOMIZED,
+            type: isRequested ? BookingType.REQUESTED :data.type ?? BookingType.CUSTOMIZED,
             tourType: data.tourType ?? TourType.PRIVATE,
             status: BookingStatus.DRAFT,
-            customerName: data.customerName ?? undefined,
-            customerEmail: data.customerEmail ?? undefined,
-            customerMobile: data.customerMobile ?? undefined,
+            customerName: resolvedCustomerName ?? undefined,
+            customerEmail: resolvedCustomerEmail ?? undefined,
+            customerMobile: resolvedCustomerMobile ?? undefined,
           },
           include: bookingInclude,
         });
@@ -464,6 +491,16 @@ export const BookingService = {
           },
           message: `Created booking ${booking.id} for ${booking.destination}`,
         });
+        if (isRequested) {
+          await logAudit(tx, {
+            actorUserId: data.userId,
+            action: "REQUESTED_CREATED",
+            entityType: "BOOKING",
+            entityId: booking.id,
+            metadata: { targetUserId: resolvedTargetUserId },
+            message: `Created requested booking ${booking.id}`,
+          });
+        }
 
         await NotificationService.create(
           {
@@ -519,7 +556,7 @@ export const BookingService = {
         // Create itinerary from tour package
         const itinerary = await tx.itinerary.create({
           data: {
-            userId: data.userId,
+            userId: isRequested ? resolvedTargetUserId : data.userId,
             title: tourPackage.title,
             destination: tourPackage.destination,
             startDate,
@@ -569,7 +606,7 @@ export const BookingService = {
         const booking = await tx.booking.create({
           data: {
             bookingCode,
-            userId: data.userId,
+            userId: isRequested ? resolvedTargetUserId : data.userId,
             itineraryId: itinerary.id,
             destination: itinerary.destination,
             startDate: startDate ?? undefined,
@@ -583,9 +620,9 @@ export const BookingService = {
             type: BookingType.STANDARD,
             tourType: data.tourType ?? TourType.PRIVATE,
             status: BookingStatus.DRAFT,
-            customerName: data.customerName ?? undefined,
-            customerEmail: data.customerEmail ?? undefined,
-            customerMobile: data.customerMobile ?? undefined,
+            customerName: resolvedCustomerName ?? undefined,
+            customerEmail: resolvedCustomerEmail ?? undefined,
+            customerMobile: resolvedCustomerMobile ?? undefined,
           },
           include: bookingInclude,
         });
@@ -603,6 +640,16 @@ export const BookingService = {
           },
           message: `Created STANDARD booking ${booking.id} from tour package ${tourPackage.title}`,
         });
+        if (isRequested) {
+          await logAudit(tx, {
+            actorUserId: data.userId,
+            action: "REQUESTED_CREATED",
+            entityType: "BOOKING",
+            entityId: booking.id,
+            metadata: { targetUserId: resolvedTargetUserId },
+            message: `Created requested booking ${booking.id}`,
+          });
+        }        
 
         await NotificationService.create(
           {
@@ -643,7 +690,7 @@ export const BookingService = {
         ? await tx.itinerary.create({
             // Deprecated inline creation path; kept for backward compatibility with legacy clients
             data: {
-              userId: data.userId,
+              userId: isRequested ? resolvedTargetUserId : data.userId,
               title: data.itinerary?.title ?? "Itinerary",
               destination: data.itinerary?.destination ?? "",
 
@@ -651,7 +698,9 @@ export const BookingService = {
               endDate: data.itinerary?.endDate ? new Date(data.itinerary.endDate) : undefined,
 
               travelers: data.itinerary?.travelers ?? 1,
-              type: data.itinerary?.type ?? ItineraryType.CUSTOMIZED,
+              type: isRequested
+                ? ItineraryType.REQUESTED
+                : data.itinerary?.type ?? ItineraryType.CUSTOMIZED,
               tourType: data.itinerary?.tourType ?? data.tourType ?? TourType.PRIVATE,
               days: data.itinerary?.days
                 ? {
@@ -713,7 +762,7 @@ export const BookingService = {
       const booking = await tx.booking.create({
         data: {
           bookingCode,
-          userId: data.userId,
+          userId: isRequested ? resolvedTargetUserId : data.userId,
           itineraryId: itinerary.id,
           destination: itinerary.destination,
           startDate: itinerary.startDate ?? undefined,  // ✅ undefined for optional Date
@@ -725,14 +774,14 @@ export const BookingService = {
             data.userBudget !== undefined
               ? (data.userBudget as unknown as Prisma.Decimal)
               : undefined,
-          type: data.type ?? (itinerary.type as BookingType),
+          type: isRequested ? BookingType.REQUESTED : data.type ?? (itinerary.type as BookingType),
           tourType: data.tourType ?? itinerary.tourType ?? TourType.PRIVATE,
           status: BookingStatus.DRAFT,
 
           // ✅ FIX: Use undefined fallback (not null)
-          customerName: data.customerName ?? undefined,
-          customerEmail: data.customerEmail ?? undefined,
-          customerMobile: data.customerMobile ?? undefined,
+          customerName: resolvedCustomerName ?? undefined,
+          customerEmail: resolvedCustomerEmail ?? undefined,
+          customerMobile: resolvedCustomerMobile ?? undefined,
         },
         include: {
           itinerary: {
@@ -756,6 +805,17 @@ export const BookingService = {
         },
         message: `Created booking ${booking.id} for ${booking.destination}`,
       });
+      if (isRequested) {
+        await logAudit(tx, {
+          actorUserId: data.userId,
+          action: "REQUESTED_CREATED",
+          entityType: "BOOKING",
+          entityId: booking.id,
+          metadata: { targetUserId: resolvedTargetUserId },
+          message: `Created requested booking ${booking.id}`,
+        });
+      }
+
       await NotificationService.create(
         {
           userId: data.userId,
@@ -891,6 +951,10 @@ export const BookingService = {
         undefined;
 
       const itineraryData = normalizedItinerary.days;
+      const itineraryType =
+        booking.type === BookingType.REQUESTED
+          ? ItineraryType.REQUESTED
+          : normalizedItinerary.type ?? undefined;      
 
       if (itineraryData) {
         if (data.version) {
@@ -901,7 +965,7 @@ export const BookingService = {
               startDate,
               endDate,
               travelers,
-              type: normalizedItinerary.type ?? undefined,
+              type: itineraryType,
               tourType,
               version: { increment: 1 },
             },
@@ -918,7 +982,7 @@ export const BookingService = {
               startDate,
               endDate,
               travelers,
-              type: normalizedItinerary.type ?? undefined,
+              type: itineraryType,
               tourType,
             },
           });
@@ -1121,10 +1185,21 @@ export const BookingService = {
     status?: BookingStatus
   ) {
     const skip = (page - 1) * limit;
-    const whereClause: Prisma.BookingWhereInput = { userId };
+    const whereClause: Prisma.BookingWhereInput = {
+      OR: [
+        { userId },
+        {
+          type: BookingType.REQUESTED,
+          itinerary: {
+            userId,
+            requestedStatus: { in: ["SENT", "CONFIRMED", "CANCELLED"] },
+          },
+        },
+      ],
+    };
 
     if (status) {
-      whereClause.status = status;
+      whereClause.AND = [{ status }];
     }
 
     const [items, total] = await prisma.$transaction([
@@ -1223,6 +1298,10 @@ export const BookingService = {
 
     if (filters.type) {
       whereClause.type = filters.type;
+      if (filters.type === "REQUESTED") {
+        whereClause.requestedBookedAt = null;
+        whereClause.requestedSourceBookingId = null;
+      }
     }
 
     if (filters.dateFrom || filters.dateTo) {
@@ -1308,8 +1387,9 @@ export const BookingService = {
     return prisma.booking.delete({ where: { id: bookingId } });
   },
 
-  async submitBooking(bookingId: string, userId: string) {
+  async submitBooking(bookingId: string, userId: string, role: string) {
     return prisma.$transaction(async (tx) => {
+      const isAdmin = role === Role.ADMIN;
       const user = await tx.user.findUnique({
         where: { id: userId },
         select: { firstName: true, lastName: true }
@@ -1317,13 +1397,17 @@ export const BookingService = {
       const userName = `${user?.firstName} ${user?.lastName}`;
 
       const booking = await tx.booking.findFirst({
-        where: { id: bookingId, userId },
+        where: { id: bookingId, ...(isAdmin ? {} : { userId }) },
         select: {
           id: true,
           status: true,
           bookingCode: true,
+          type: true,
           itinerary: {
             select: {
+              id: true,
+              userId: true,
+              requestedStatus: true,
               days: {
                 select: {
                   activities: { select: { id: true } },
@@ -1335,6 +1419,41 @@ export const BookingService = {
       });
 
       if (!booking) throw new Error("BOOKING_NOT_FOUND");
+      if (booking.type === BookingType.REQUESTED && !isAdmin) {
+        throw new Error("BOOKING_FORBIDDEN");
+      }
+      if (booking.type === BookingType.REQUESTED && isAdmin) {
+        const requestedStatus = booking.itinerary?.requestedStatus;
+        if (!booking.itinerary?.id) {
+          throw new Error("ITINERARY_NOT_FOUND");
+        }
+        if (requestedStatus === "CANCELLED") {
+          throw new Error("CANNOT_SEND_CANCELLED");
+        }
+        if (requestedStatus === "SENT" || requestedStatus === "CONFIRMED") {
+          return booking;
+        }
+
+        await tx.itinerary.update({
+          where: { id: booking.itinerary.id },
+          data: {
+            requestedStatus: "SENT",
+            sentStatus: "Sent",
+            sentAt: new Date(),
+          },
+        });
+
+        await logAudit(tx, {
+          actorUserId: userId,
+          action: "REQUESTED_SENT",
+          entityType: "BOOKING",
+          entityId: bookingId,
+          metadata: { status: "SENT" },
+          message: `Sent requested booking ${bookingId}`,
+        });
+
+        return booking;
+      }      
       if (!["DRAFT", "REJECTED"].includes(booking.status)) {
         throw new Error("CANNOT_SUBMIT");
       }
@@ -1387,11 +1506,51 @@ export const BookingService = {
   async cancelBooking(bookingId: string, userId: string) {
     return prisma.$transaction(async (tx) => {
       const booking = await tx.booking.findFirst({
-        where: { id: bookingId, userId },
-        select: { id: true, status: true },
+        where: { id: bookingId },
+        select: {
+          id: true,
+          status: true,
+          type: true,
+          itineraryId: true,
+          itinerary: { select: { userId: true, requestedStatus: true } },
+        },
       });
 
       if (!booking) throw new Error("BOOKING_NOT_FOUND");
+      if (booking.type === BookingType.REQUESTED) {
+        if (booking.itinerary?.userId !== userId) {
+          throw new Error("BOOKING_FORBIDDEN");
+        }
+        if (booking.itinerary?.requestedStatus === "CANCELLED") {
+          return booking;
+        }
+        if (booking.itinerary?.requestedStatus !== "SENT") {
+          throw new Error("CANNOT_CANCEL");
+        }
+
+        const updated = await tx.booking.update({
+          where: { id: bookingId },
+          data: { status: "CANCELLED", isResolved: true },
+        });
+
+        await tx.itinerary.update({
+          where: { id: booking.itineraryId },
+          data: {
+            requestedStatus: "CANCELLED",
+          },
+        });
+
+        await logAudit(tx, {
+          actorUserId: userId,
+          action: "REQUESTED_CANCELLED",
+          entityType: "BOOKING",
+          entityId: bookingId,
+          metadata: { status: "CANCELLED" },
+          message: `Cancelled requested booking ${bookingId}`,
+        });
+
+        return updated;
+      }
 
       // common rule: allow cancel if not completed
       if (["COMPLETED", "CANCELLED"].includes(booking.status)) {
@@ -1410,6 +1569,173 @@ export const BookingService = {
         entityId: bookingId,
         metadata: { status: updated.status },
         message: `Cancelled booking ${bookingId}`,
+      });
+
+      return updated;
+    });
+  },
+
+  async confirmRequestedBooking(bookingId: string, userId: string) {
+    return prisma.$transaction(async (tx) => {
+      const booking = await tx.booking.findUnique({
+        where: { id: bookingId },
+        select: {
+          id: true,
+          status: true,
+          type: true,
+          itineraryId: true,
+          itinerary: { select: { userId: true, requestedStatus: true } },
+        },
+      });
+
+      if (!booking) throw new Error("BOOKING_NOT_FOUND");
+      if (booking.type !== BookingType.REQUESTED) {
+        throw new Error("NOT_REQUESTED");
+      }
+      if (booking.itinerary?.userId !== userId) {
+        throw new Error("BOOKING_FORBIDDEN");
+      }
+      if (booking.itinerary?.requestedStatus === "CONFIRMED") {
+        return booking;
+      }
+      if (booking.itinerary?.requestedStatus !== "SENT") {
+        throw new Error("CANNOT_CONFIRM");
+      }
+
+      const updated = await tx.booking.update({
+        where: { id: bookingId },
+        data: { status: "CONFIRMED" },
+      });
+
+      await tx.itinerary.update({
+        where: { id: booking.itineraryId },
+        data: {
+          requestedStatus: "CONFIRMED",
+          confirmedAt: new Date(),
+        },
+      });
+
+      await logAudit(tx, {
+        actorUserId: userId,
+        action: "REQUESTED_CONFIRMED",
+        entityType: "BOOKING",
+        entityId: bookingId,
+        metadata: { status: "CONFIRMED" },
+        message: `Confirmed requested booking ${bookingId}`,
+      });
+
+      return updated;
+    });
+  },
+
+  async bookFromRequested(bookingId: string, actorId: string) {
+    return prisma.$transaction(async (tx) => {
+      const requestedBooking = await tx.booking.findUnique({
+        where: { id: bookingId },
+        include: {
+          itinerary: true,
+        },
+      });
+
+      if (!requestedBooking) throw new Error("BOOKING_NOT_FOUND");
+      if (requestedBooking.type !== BookingType.REQUESTED) {
+        throw new Error("NOT_REQUESTED");
+      }
+      if (requestedBooking.itinerary?.requestedStatus === "CANCELLED") {
+        throw new Error("REQUESTED_CANCELLED");
+      }
+      if (requestedBooking.itinerary?.requestedStatus !== "CONFIRMED") {
+        throw new Error("REQUESTED_NOT_CONFIRMED");
+      }
+
+      const existingBooked = await tx.booking.findFirst({
+        where: { requestedSourceBookingId: bookingId },
+      });
+      if (existingBooked) {
+        return existingBooked;
+      }
+
+      const bookingCode = await generateBookingCode(tx);
+
+      const booked = await tx.booking.create({
+        data: {
+          bookingCode,
+          userId: requestedBooking.userId,
+          itineraryId: requestedBooking.itineraryId,
+          destination: requestedBooking.destination,
+          startDate: requestedBooking.startDate ?? undefined,
+          endDate: requestedBooking.endDate ?? undefined,
+          travelers: requestedBooking.travelers ?? 1,
+          totalPrice: requestedBooking.totalPrice as unknown as Prisma.Decimal,
+          type: BookingType.REQUESTED,
+          tourType: TourType.PRIVATE,
+          status: BookingStatus.CONFIRMED,
+          paymentStatus: "PENDING",
+          customerName: requestedBooking.customerName ?? undefined,
+          customerEmail: requestedBooking.customerEmail ?? undefined,
+          customerMobile: requestedBooking.customerMobile ?? undefined,
+          requestedSourceBookingId: bookingId,
+        },
+      });
+
+      await tx.booking.update({
+        where: { id: bookingId },
+        data: { requestedBookedAt: new Date() },
+      });
+
+      await logAudit(tx, {
+        actorUserId: actorId,
+        action: "REQUESTED_BOOKED",
+        entityType: "BOOKING",
+        entityId: booked.id,
+        metadata: { sourceBookingId: bookingId },
+        message: `Booked requested itinerary ${bookingId}`,
+      });
+
+      return booked;
+    });
+  },
+
+  async moveBookedToRequested(bookingId: string, actorId: string) {
+    return prisma.$transaction(async (tx) => {
+      const booking = await tx.booking.findUnique({
+        where: { id: bookingId },
+        select: {
+          id: true,
+          requestedSourceBookingId: true,
+          paymentStatus: true,
+          startDate: true,
+        },
+      });
+
+      if (!booking) throw new Error("BOOKING_NOT_FOUND");
+      if (!booking.requestedSourceBookingId) {
+        throw new Error("NOT_REQUESTED_ORIGIN");
+      }
+      if (booking.paymentStatus !== "PENDING") {
+        throw new Error("BOOKING_PAID");
+      }
+      if (booking.startDate && booking.startDate <= new Date()) {
+        throw new Error("BOOKING_ALREADY_STARTED");
+      }
+
+      await tx.booking.update({
+        where: { id: booking.requestedSourceBookingId },
+        data: { requestedBookedAt: null },
+      });
+
+      const updated = await tx.booking.update({
+        where: { id: bookingId },
+        data: { status: "CANCELLED", isResolved: true },
+      });
+
+      await logAudit(tx, {
+        actorUserId: actorId,
+        action: "REQUESTED_MOVED_BACK",
+        entityType: "BOOKING",
+        entityId: bookingId,
+        metadata: { sourceBookingId: booking.requestedSourceBookingId },
+        message: `Moved booked requested itinerary ${bookingId} back to requested`,
       });
 
       return updated;

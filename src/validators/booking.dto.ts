@@ -128,6 +128,7 @@ export const createBookingDto = z
     customerEmail: z.string().email("Invalid email address").optional(),
     customerMobile: z.string().min(1, "Customer mobile number is required").optional(),
 
+    userId: z.string().uuid().optional(),
     itineraryId: z.string().uuid().optional(),
     tourPackageId: z.string().uuid().optional(),
     itinerary: inlineItineraryDto.optional(),

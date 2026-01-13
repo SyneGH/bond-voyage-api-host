@@ -19,6 +19,7 @@ router.post("/", bookingRateLimit, asyncHandler(BookingController.create));
 
 // USER: submit, cancel
 router.patch("/:id/submit", bookingRateLimit, asyncHandler(BookingController.submit));
+router.patch("/:id/confirm", asyncHandler(BookingController.confirm));
 router.patch("/:id/cancel", asyncHandler(BookingController.cancel));
 
 // USER: edit itinerary
@@ -46,6 +47,17 @@ router.patch(
   "/:id/status",
   authorize([Role.ADMIN]),
   asyncHandler(BookingController.updateStatus)
+);
+
+router.post(
+  "/:id/book-requested",
+  authorize([Role.ADMIN]),
+  asyncHandler(BookingController.bookRequested)
+);
+router.post(
+  "/:id/move-to-requested",
+  authorize([Role.ADMIN]),
+  asyncHandler(BookingController.moveToRequested)
 );
 
 // COLLABORATION
