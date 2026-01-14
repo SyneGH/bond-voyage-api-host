@@ -19,8 +19,7 @@ import { prisma } from "@/config/database";
 import { dashboardStatsQueryDto } from "@/validators/dashboard.dto";
 import { DashboardService } from "@/services/dashboard.service";
 import { activityLogListQueryDto } from "@/validators/activity-log.dto";
-import { ActivityLogService, logActivity } from "@/services/activity-log.service";
-import { ActivityEventCodes } from "@/constants/activity-events";
+import { ActivityLogService } from "@/services/activity-log.service";
 import { serializeUser } from "@/utils/serialize";
 
 class UserController {
@@ -457,27 +456,15 @@ class UserController {
     res: Response
   ): Promise<void> => {
     try {
-      const {
-        page,
-        limit,
-        type,
-        action,
-        eventCode,
-        entityType,
-        entityId,
-        dateFrom,
-        dateTo,
-      } = activityLogListQueryDto.omit({ actorId: true, actorRole: true, targetUserId: true }).parse(
-        req.query
-      );
+      const { page, limit, type, action, entityType, entityId, dateFrom, dateTo } =
+        activityLogListQueryDto.omit({ actorId: true }).parse(req.query);
 
       const authUser = requireAuthUser(req);
 
       const result = await ActivityLogService.list({
         page,
         limit,
-        scopeUserId: authUser.userId,
-        eventCode,
+        actorId: authUser.userId,
         action: action ?? type,
         entityType,
         entityId,
@@ -595,19 +582,6 @@ class UserController {
       await userService.updateById(authUser.userId, { password: hashedNewPassword });
 
       await redis.del(this.generateCacheKey.singleUser(authUser.userId));
-
-      await logActivity(prisma, {
-        actorId: authUser.userId,
-        eventCode: ActivityEventCodes.USER_PASSWORD_CHANGED,
-        action: "CHANGED",
-        entityType: "USER",
-        entityId: authUser.userId,
-        details: "User changed password",
-        reqContext: {
-          ipAddress: req.ip,
-          userAgent: req.get("user-agent") ?? undefined,
-        },
-      });
 
       createResponse(res, HTTP_STATUS.OK, "Password updated successfully");
     } catch (error) {

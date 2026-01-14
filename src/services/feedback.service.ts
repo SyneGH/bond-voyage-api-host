@@ -1,10 +1,8 @@
 import { prisma } from "@/config/database";
-import { logActivity } from "@/services/activity-log.service";
-import { ActivityEventCodes } from "@/constants/activity-events";
 
 export const FeedbackService = {
   async create(userId: string, rating: number, comment?: string | null) {
-    const feedback = await prisma.feedback.create({
+    return prisma.feedback.create({
       data: {
         userId,
         rating,
@@ -14,16 +12,6 @@ export const FeedbackService = {
         user: { select: { id: true, firstName: true, lastName: true, email: true } },
       },
     });
-    await logActivity(prisma, {
-      actorId: userId,
-      eventCode: ActivityEventCodes.USER_FEEDBACK_SUBMITTED,
-      action: "SUBMITTED",
-      entityType: "FEEDBACK",
-      entityId: feedback.id,
-      metadata: { rating },
-      details: "Submitted feedback",
-    });
-    return feedback;
   },
 
   async list(params: { page: number; limit: number }) {
