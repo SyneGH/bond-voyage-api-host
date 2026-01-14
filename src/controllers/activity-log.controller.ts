@@ -10,43 +10,23 @@ import { requireAuthUser } from "@/utils/requestGuards";
 export const ActivityLogController = {
   list: async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
-      const {
-        page,
-        limit,
-        actorId,
-        actorRole,
-        eventCode,
-        targetUserId,
-        type,
-        action,
-        entityType,
-        entityId,
-        dateFrom,
-        dateTo,
-        category,
-      } = activityLogListQueryDto.parse(req.query);
+      const { page, limit, actorId, type, action, entityType, entityId, dateFrom, dateTo } =
+        activityLogListQueryDto.parse(req.query);
 
       const authUser = requireAuthUser(req);
 
       // SECURITY: Non-admins are only allowed to see their own activity logs
-      const isAdmin = authUser.role === Role.ADMIN;
-      const effectiveActorId = isAdmin ? actorId : undefined;
-      const scopeUserId = isAdmin ? undefined : authUser.userId;
+      const effectiveActorId = authUser.role === Role.ADMIN ? actorId : authUser.userId;
 
       const result = await ActivityLogService.list({
         page,
         limit,
         actorId: effectiveActorId,
-        actorRole: isAdmin ? actorRole : undefined,
-        eventCode,
-        targetUserId: isAdmin ? targetUserId : undefined,
-        scopeUserId,
         action: action ?? type,
         entityType,
         entityId,
         dateFrom,
         dateTo,
-        category,
       });
       createResponse(res, HTTP_STATUS.OK, "Activity logs retrieved", result.items, result.meta);
     } catch (error) {

@@ -1,8 +1,7 @@
 import { prisma } from "@/config/database";
 import { Prisma } from "@prisma/client";
-import { logActivity, logAudit } from "@/services/activity-log.service";
+import { logAudit } from "@/services/activity-log.service";
 import { NotificationService } from "@/services/notification.service";
-import { ActivityEventCodes } from "@/constants/activity-events";
 
 interface CreatePaymentInput {
   bookingId: string;
@@ -51,19 +50,18 @@ export const PaymentService = {
         },
       });
 
-      await logActivity(tx, {
-        actorId: data.userId,
-        eventCode: ActivityEventCodes.USER_PAYMENT_COMPLETED,
-        action: "COMPLETED",
+      await logAudit(tx, {
+        actorUserId: data.userId,
+        action: "PAYMENT_SUBMITTED",
         entityType: "PAYMENT",
         entityId: payment.id,
         metadata: {
           bookingId: booking.id,
           bookingCode: booking.bookingCode,
           amount: data.amount,
-          provider: data.method ?? "GCASH",
+          method: data.method ?? "GCASH",
         },
-        details: `Submitted payment ${payment.id} for booking ${booking.id}`,
+        message: `Submitted payment ${payment.id} for booking ${booking.id}`,
       });
       await NotificationService.create(
         {

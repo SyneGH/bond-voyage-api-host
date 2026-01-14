@@ -85,11 +85,7 @@ class AuthController {
       const payload = loginDto.parse(req.body);
       const { user, accessToken, refreshToken } = await authService.login(
         payload.email,
-        payload.password,
-        {
-          ipAddress: req.ip,
-          userAgent: req.get("user-agent") ?? undefined,
-        }
+        payload.password
       );
 
       if (!user) {
