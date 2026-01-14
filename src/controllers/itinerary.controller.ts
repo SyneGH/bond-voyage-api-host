@@ -15,6 +15,9 @@ import { AppError, createResponse, throwError } from "@/utils/responseHandler";
 import { HTTP_STATUS } from "@/constants/constants";
 import { ZodError } from "zod";
 import { requireAuthUser } from "@/utils/requestGuards";
+import { logActivity } from "@/services/activity-log.service";
+import { ActivityEventCodes } from "@/constants/activity-events";
+import { prisma } from "@/config/database";
 
 export const ItineraryController = {
   create: async (req: AuthenticatedRequest, res: Response): Promise<void> => {
@@ -42,10 +45,23 @@ export const ItineraryController = {
   getOne: async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
       const { id } = itineraryIdParamDto.parse(req.params);
+      const authUser = requireAuthUser(req);
       const itinerary = await ItineraryService.getById(id);
       if (!itinerary) {
         throwError(HTTP_STATUS.NOT_FOUND, "Itinerary not found");
       }
+
+      await logActivity(prisma, {
+        actorId: authUser.userId,
+        eventCode: ActivityEventCodes.USER_ITINERARY_VIEWED,
+        action: "VIEWED",
+        entityType: "TRAVEL_PLAN",
+        entityId: id,
+        reqContext: {
+          ipAddress: req.ip,
+          userAgent: req.get("user-agent") ?? undefined,
+        },
+      });
 
       createResponse(res, HTTP_STATUS.OK, "Itinerary retrieved", itinerary);
     } catch (error) {
