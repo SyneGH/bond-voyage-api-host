@@ -41,6 +41,11 @@ enum RequestStatus {
   CANCELLED
 }
 
+enum ConfirmStatus {
+  UNCONFIRMED
+  CONFIRMED
+}
+
 enum BookingType {
   STANDARD // Booked from a pre-made package
   CUSTOMIZED // Built by user (or AI)
@@ -184,6 +189,7 @@ model Itinerary {
 
   // Track Admin-to-User flow for "Requested" itineraries
   sentStatus      String? // e.g., "Draft", "Sent to User"
+  confirmStatus   ConfirmStatus @default(UNCONFIRMED)
   requestedStatus RequestStatus @default(DRAFT)
   sentAt          DateTime?
   confirmedAt     DateTime?
