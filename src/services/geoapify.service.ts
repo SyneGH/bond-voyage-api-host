@@ -14,6 +14,7 @@ type MatrixCell = {
 const GEOAPIFY_BASE_URL = "https://api.geoapify.com/v1";
 const AUTOCOMPLETE_TTL_MS = 5 * 60 * 1000;
 const MATRIX_TTL_MS = 10 * 60 * 1000;
+const ROUTE_TTL_MS = 5 * 60 * 1000;
 
 const geoapifyClient = axios.create({
   baseURL: GEOAPIFY_BASE_URL,
@@ -27,6 +28,7 @@ export class GeoapifyService {
     times: Array<Array<number | null>>;
     raw: unknown;
   }>();
+  private static routeCache = new TTLCache<unknown>();
 
   private static getApiKey(): string {
     const apiKey = process.env.GEOAPIFY_API_KEY;
@@ -160,18 +162,30 @@ export class GeoapifyService {
     return normalized;
   }
 
-  static async route(points: Coordinate[], mode = "drive"): Promise<unknown> {
+  static async route(
+    points: Coordinate[],
+    mode = "drive",
+    type?: string
+  ): Promise<unknown> {
     const apiKey = this.getApiKey();
     const waypoints = points.map((point) => `${point.lat},${point.lng}`).join("|");
+    const routeType = type ?? "balanced";
+    const cacheKey = `route:${mode}:${routeType}:${waypoints}`;
+    const cached = this.routeCache.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
 
     const response = await geoapifyClient.get("/routing", {
       params: {
         waypoints,
         mode,
+        type: routeType,
         apiKey,
       },
     });
 
+    this.routeCache.set(cacheKey, response.data, ROUTE_TTL_MS);
     return response.data;
   }
 }
