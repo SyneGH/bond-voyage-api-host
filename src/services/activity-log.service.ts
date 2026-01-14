@@ -1,6 +1,12 @@
 import { prisma } from "@/config/database";
 import { PrismaClient, Prisma, UserRole } from "@prisma/client";
 import { ActivityEventCode } from "@/constants/activity-events";
+import {
+  getActivityDisplay,
+  getEventCodesForCategory,
+  CategoryGroups,
+  type ActivityCategory,
+} from "@/constants/activity-display";
 
 type ActivityLogClient = Prisma.TransactionClient | PrismaClient;
 
@@ -176,7 +182,7 @@ export async function logActivity(tx: ActivityLogClient, payload: ActivityLogPay
         entityType: payload.entityType ?? null,
         entityId: payload.entityId ?? null,
         targetUserId: payload.targetUserId ?? null,
-        metadata: metadata ?? Prisma.DbNull,
+        metadata: (metadata ?? Prisma.DbNull) as Prisma.InputJsonValue | typeof Prisma.DbNull,
         details: payload.details ?? null,
         ipAddress: payload.reqContext?.ipAddress ?? null,
         userAgent: payload.reqContext?.userAgent ?? null,
@@ -204,6 +210,9 @@ export async function logAudit(tx: ActivityLogClient, payload: AuditLogPayload) 
 
 const mapLog = (log: any) => {
   const legacy = parseLegacyDetails(log.details);
+  const metadata = log.metadata ?? legacy.metadata;
+  const display = getActivityDisplay(log.eventCode, metadata as Record<string, unknown>);
+
   return {
     id: log.id,
     createdAt: log.createdAt,
@@ -216,12 +225,15 @@ const mapLog = (log: any) => {
     action: log.action,
     entityType: log.entityType ?? legacy.entityType,
     entityId: log.entityId ?? legacy.entityId,
-    metadata: log.metadata ?? legacy.metadata,
+    metadata,
     ipAddress: log.ipAddress ?? undefined,
     userAgent: log.userAgent ?? undefined,
     details: log.details ?? legacy.message ?? undefined,
+    display,
   };
 };
+
+export type CategoryFilter = keyof typeof CategoryGroups;
 
 export const ActivityLogService = {
   async list(params: {
@@ -237,6 +249,7 @@ export const ActivityLogService = {
     scopeUserId?: string;
     dateFrom?: Date;
     dateTo?: Date;
+    category?: CategoryFilter;
   }) {
     const {
       page,
@@ -251,6 +264,7 @@ export const ActivityLogService = {
       scopeUserId,
       dateFrom,
       dateTo,
+      category,
     } = params;
     const skip = (page - 1) * limit;
 
@@ -260,11 +274,15 @@ export const ActivityLogService = {
         }
       : {};
 
+    // Build category filter based on event codes
+    const categoryEventCodes = category ? getEventCodesForCategory(category) : undefined;
+
     const where = {
       ...scopedFilter,
       ...(actorId ? { actorId } : {}),
       ...(actorRole ? { actorRole } : {}),
       ...(eventCode ? { eventCode } : {}),
+      ...(categoryEventCodes ? { eventCode: { in: categoryEventCodes } } : {}),
       ...(action ? { action: { contains: action, mode: "insensitive" as const } } : {}),
       ...(entityType ? { entityType } : {}),
       ...(entityId ? { entityId } : {}),

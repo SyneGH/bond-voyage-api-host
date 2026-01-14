@@ -38,4 +38,8 @@ export const activityLogListQueryDto = z.object({
   type: z.string().optional(),
   dateFrom: dateQuerySchema,
   dateTo: dateQuerySchema,
+  // Category filter for grouping activity types
+  category: z
+    .enum(["BOOKING", "ITINERARY", "USER", "PAYMENT", "INQUIRY", "FEEDBACK", "SYSTEM"])
+    .optional(),
 });

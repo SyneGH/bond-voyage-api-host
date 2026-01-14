@@ -23,6 +23,7 @@ export const ActivityLogController = {
         entityId,
         dateFrom,
         dateTo,
+        category,
       } = activityLogListQueryDto.parse(req.query);
 
       const authUser = requireAuthUser(req);
@@ -45,6 +46,7 @@ export const ActivityLogController = {
         entityId,
         dateFrom,
         dateTo,
+        category,
       });
       createResponse(res, HTTP_STATUS.OK, "Activity logs retrieved", result.items, result.meta);
     } catch (error) {
