@@ -543,7 +543,7 @@ export const ItineraryService = {
 
       const isOwner = share.itinerary.userId === userId;
       const isCollaborator = share.itinerary.collaborators.some(
-        (collab) => collab.userId === userId
+        (collab: { userId: string }) => collab.userId === userId
       );
 
       if (isOwner || isCollaborator) {

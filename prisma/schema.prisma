@@ -140,6 +140,7 @@ model User {
   notifications         Notification[]
   paymentSubmissions    Payment[]               @relation("payment_submissions")
   createdItineraryVersions ItineraryVersion[]   @relation("itinerary_versions_created")
+  sharesCreated         ItineraryShare[]        @relation("share_creator")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -204,6 +205,7 @@ model Itinerary {
   bookings      Booking[]
   inquiries     Inquiry[]
   versions      ItineraryVersion[]
+  shares        ItineraryShare[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -275,6 +277,22 @@ model ItineraryCollaborator {
 
   @@unique([itineraryId, userId])
   @@map("itinerary_collaborators")
+}
+
+model ItineraryShare {
+  id          String           @id @default(uuid())
+  token       String           @unique
+  itineraryId String
+  itinerary   Itinerary        @relation(fields: [itineraryId], references: [id], onDelete: Cascade)
+  createdById String
+  createdBy   User             @relation("share_creator", fields: [createdById], references: [id])
+  role        CollaboratorRole @default(COLLABORATOR)
+  maxUses     Int              @default(5)
+  uses        Int              @default(0)
+  revokedAt   DateTime?
+  createdAt   DateTime         @default(now())
+
+  @@map("itinerary_shares")
 }
 
 // =========================================
