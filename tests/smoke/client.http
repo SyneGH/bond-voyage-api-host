@@ -9,7 +9,7 @@
 
 @localBaseUrl = http://localhost:8087/api/v1
 @prodBaseUrl = https://bond-voyage-api-host.onrender.com/api/v1
-@baseUrl = {{localBaseUrl}}
+@baseUrl = {{prodBaseUrl}}
 
 @email = user@example.com
 @password = User@123
@@ -48,13 +48,13 @@ POST {{baseUrl}}/auth/register
 Content-Type: application/json
 
 {
-  "firstName": "Felix",
-  "lastName": "Melgar",
-  "email": "felixangelomelgar5@gmail.com",
-  "mobile": "09612133522",
-  "password": "Felix@123",
+  "firstName": "Madam",
+  "lastName": "Jhing",
+  "email": "madam@example.com",
+  "mobile": "09675253562",
+  "password": "Madam@123",
   "role": "ADMIN",
-  "birthday": "2004-05-05"
+  "birthday": "2004-01-01"
 }
 
 ### Register user
@@ -63,10 +63,10 @@ POST {{baseUrl}}/auth/register
 Content-Type: application/json
 
 {
-  "firstName": "Felix",
-  "lastName": "Melgar",
+  "firstName": "John",
+  "lastName": "Doe",
   "email": "{{email}}",
-  "mobile": "09612133520",
+  "mobile": "09123456789",
   "password": "{{password}}",
   "role": "USER",
   "birthday": "2004-05-05"

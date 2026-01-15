@@ -495,7 +495,7 @@ export const BookingService = {
 
         await NotificationService.create(
           {
-            userId: data.userId,
+            userId: booking.userId,
             type: "BOOKING",
             title: "Booking created",
             message: `Your booking to ${booking.destination} has been created.`,
@@ -635,7 +635,7 @@ export const BookingService = {
 
         await NotificationService.create(
           {
-            userId: data.userId,
+            userId: booking.userId,
             type: "BOOKING",
             title: "Booking created",
             message: `Your booking for ${tourPackage.title} has been created.`,
@@ -690,7 +690,16 @@ export const BookingService = {
                       dayNumber: day.dayNumber,
                       title: day.title ?? null,
                       date: day.date ? new Date(day.date) : undefined,
-                      activities: { create: day.activities },
+                        activities: {
+                          create: (day.activities ?? []).map((activity) => ({
+                            time: activity.time ?? "00:00",
+                            title: activity.title ?? "Activity",
+                            description: activity.description ?? null,
+                            location: activity.location ?? null,
+                            icon: activity.icon ?? null,
+                            order: activity.order ?? 0,
+                          })),
+                        },
                     })),
                   }
                 : undefined,
@@ -791,7 +800,7 @@ export const BookingService = {
 
       await NotificationService.create(
         {
-          userId: data.userId,
+          userId: booking.userId,
           type: "BOOKING",
           title: "Booking created",
           message: `Your booking to ${booking.destination} has been created.`,
@@ -973,7 +982,16 @@ export const BookingService = {
               dayNumber: day.dayNumber,
               title: day.title ?? undefined,
               date: day.date ?? undefined,
-              activities: { create: day.activities ?? [] },
+                activities: {
+                  create: (day.activities ?? []).map((activity) => ({
+                    time: activity.time ?? "00:00",
+                    title: activity.title ?? "Activity",
+                    description: activity.description ?? null,
+                    location: activity.location ?? null,
+                    icon: activity.icon ?? null,
+                    order: activity.order ?? 0,
+                  })),
+                },
             },
           });
         }
