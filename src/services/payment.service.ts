@@ -1,6 +1,6 @@
 import { prisma } from "@/config/database";
 import { Prisma } from "@prisma/client";
-import { logAudit } from "@/services/activity-log.service";
+import { logAudit, ActivityAction } from "@/services/activity-log.service";
 import { NotificationService } from "@/services/notification.service";
 
 interface CreatePaymentInput {
@@ -52,7 +52,7 @@ export const PaymentService = {
 
       await logAudit(tx, {
         actorUserId: data.userId,
-        action: "PAYMENT_SUBMITTED",
+        action: ActivityAction.PAYMENT_RECEIVED,
         entityType: "PAYMENT",
         entityId: payment.id,
         metadata: {
@@ -61,7 +61,7 @@ export const PaymentService = {
           amount: data.amount,
           method: data.method ?? "GCASH",
         },
-        message: `Submitted payment ${payment.id} for booking ${booking.id}`,
+        message: "Payment submitted",
       });
       await NotificationService.create(
         {
@@ -122,7 +122,7 @@ export const PaymentService = {
       if (actorUserId) {
         await logAudit(tx, {
           actorUserId,
-          action: status === "VERIFIED" ? "PAYMENT_VERIFIED" : "PAYMENT_REJECTED",
+          action: status === "VERIFIED" ? ActivityAction.PAYMENT_VERIFIED : ActivityAction.PAYMENT_RECEIVED,
           entityType: "PAYMENT",
           entityId: payment.id,
           metadata: {
@@ -131,7 +131,7 @@ export const PaymentService = {
             status,
             rejectionReason: rejectionReason ?? undefined,
           },
-          message: `Payment ${payment.id} marked as ${status}`,
+          message: status === "VERIFIED" ? "Payment verified" : "Payment rejected",
         });
       }
 

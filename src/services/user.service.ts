@@ -3,7 +3,7 @@ import { User, Prisma } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { BCRYPT_SALT_ROUNDS } from "@/constants/constants";
 import { RegisterDto, UserUpdateDto } from "@/types";
-import { logAudit } from "./activity-log.service";
+import { logAudit, ActivityAction } from "./activity-log.service";
 
 // Define the shape of the query object based on your DTO
 interface UserQuery {
@@ -95,11 +95,11 @@ export class UserService {
     const user = await this.create(data);
     await logAudit(prisma, {
       actorUserId: actorId,
-      action: "USER_CREATED",
+      action: ActivityAction.USER_CREATED,
       entityType: "USER",
       entityId: user.id,
       metadata: { email: user.email },
-      message: `Created user ${user.email}`,
+      message: "User created",
     });
     return user;
   }
@@ -193,10 +193,10 @@ export class UserService {
     if (user) {
       await logAudit(prisma, {
         actorUserId: actorId,
-        action: "USER_UPDATED",
+        action: ActivityAction.USER_UPDATED,
         entityType: "USER",
         entityId: id,
-        message: `Updated user ${id}`,
+        message: "User updated",
       });
     }
     return user;
@@ -217,10 +217,10 @@ export class UserService {
     if (user) {
       await logAudit(prisma, {
         actorUserId: userId,
-        action: "USER_PROFILE_UPDATED",
+        action: ActivityAction.USER_PROFILE_UPDATED,
         entityType: "USER",
         entityId: userId,
-        message: `Updated profile for user ${userId}`,
+        message: "Profile updated",
       });
     }
     return user;
@@ -290,10 +290,10 @@ export class UserService {
     const user = await this.deactivate(id);
     await logAudit(prisma, {
       actorUserId: actorId,
-      action: "USER_DEACTIVATED",
+      action: ActivityAction.USER_DEACTIVATED,
       entityType: "USER",
       entityId: id,
-      message: `Deactivated user ${id}`,
+      message: "User deactivated",
     });
     return user;
   }
@@ -308,10 +308,10 @@ export class UserService {
     const user = await this.delete(id);
     await logAudit(prisma, {
       actorUserId: actorId,
-      action: "USER_DELETED",
+      action: ActivityAction.USER_DELETED,
       entityType: "USER",
       entityId: id,
-      message: `Deleted user ${id}`,
+      message: "User deleted",
     });
     return user;
   }

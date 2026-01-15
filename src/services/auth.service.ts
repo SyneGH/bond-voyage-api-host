@@ -5,7 +5,7 @@ import { User, UserRole } from "@prisma/client";
 import userService from "@/services/user.service";
 import { throwError } from "@/utils/responseHandler";
 import { HTTP_STATUS } from "@/constants/constants";
-import { logAudit } from "@/services/activity-log.service";
+import { logAudit, ActivityAction } from "@/services/activity-log.service";
 
 interface RegisterInput {
   email: string;
@@ -130,15 +130,13 @@ export class AuthService {
 
     await logAudit(prisma, {
       actorUserId: authUser.id,
-      action: "AUTH_LOGIN",
+      action: ActivityAction.AUTH_LOGIN,
       entityType: "AUTH",
-      metadata: { 
+      metadata: {
         email: authUser.email,
         sessionReplaced: hadExistingSessions,
       },
-      message: hadExistingSessions 
-        ? "User login successful - previous session invalidated"
-        : "User login successful",
+      message: "Login successful",
     });
 
     return { user: authUser, accessToken, refreshToken };
@@ -200,22 +198,14 @@ export class AuthService {
         },
       });
 
-      await logAudit(prisma, {
-        actorUserId: authUser.id,
-        action: "AUTH_REFRESH",
-        entityType: "AUTH",
-        message: "Refresh token rotated (expiring soon)",
-      });
+      // Note: Token refresh is not logged to activity logs per requirements
+      // Only user login/logout events should be logged
 
       return { accessToken, refreshToken: newRefreshToken };
     }
 
-    await logAudit(prisma, {
-      actorUserId: authUser.id,
-      action: "AUTH_REFRESH",
-      entityType: "AUTH",
-      message: "Refresh token rotated",
-    });
+    // Note: Token refresh is not logged to activity logs per requirements
+    // Only user login/logout events should be logged
 
     return { accessToken, refreshToken };
   }
@@ -258,9 +248,9 @@ export class AuthService {
 
     await logAudit(prisma, {
       actorUserId: userId,
-      action: "AUTH_LOGOUT",
+      action: ActivityAction.AUTH_LOGOUT,
       entityType: "AUTH",
-      message: "User logged out",
+      message: "Logged out",
     });
   }
 
@@ -272,9 +262,10 @@ export class AuthService {
 
     await logAudit(prisma, {
       actorUserId: userId,
-      action: "AUTH_LOGOUT_ALL",
+      action: ActivityAction.AUTH_LOGOUT,
       entityType: "AUTH",
-      message: "User logged out from all sessions",
+      metadata: { allSessions: true },
+      message: "Logged out from all sessions",
     });
   }
 

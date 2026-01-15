@@ -8,7 +8,7 @@ import {
 } from "@prisma/client";
 import { prisma } from "@/config/database";
 import { serializeItinerary, toISO } from "@/utils/serialize";
-import { logAudit } from "@/services/activity-log.service";
+import { logAudit, ActivityAction } from "@/services/activity-log.service";
 import { serializeVersion } from "@/utils/serialize";
 
 interface UpsertItineraryInput {
@@ -171,11 +171,11 @@ export const ItineraryService = {
 
       await logAudit(tx, {
         actorUserId: data.userId,
-        action: "ITINERARY_CREATED",
+        action: ActivityAction.ITINERARY_CREATED,
         entityType: "ITINERARY",
         entityId: created.id,
         metadata: { destination: data.destination },
-        message: `Created itinerary ${created.id}`,
+        message: "Itinerary created",
       });
 
       return created;
@@ -314,11 +314,11 @@ export const ItineraryService = {
 
       await logAudit(tx, {
         actorUserId: userId,
-        action: "ITINERARY_UPDATED",
+        action: ActivityAction.ITINERARY_UPDATED,
         entityType: "ITINERARY",
         entityId: id,
         metadata: { destination, travelers },
-        message: `Updated itinerary ${id}`,
+        message: "Itinerary updated",
       });
 
       return serializeItinerary(updated);
@@ -364,10 +364,10 @@ export const ItineraryService = {
 
     await logAudit(prisma, {
       actorUserId: userId,
-      action: "ITINERARY_SENT",
+      action: ActivityAction.ITINERARY_SENT,
       entityType: "ITINERARY",
       entityId: id,
-      message: `Sent itinerary ${id}`,
+      message: "Itinerary sent to client",
     });
     return serializeItinerary(updated);
   },
@@ -399,10 +399,10 @@ export const ItineraryService = {
 
     await logAudit(prisma, {
       actorUserId: userId,
-      action: "ITINERARY_CONFIRMED",
+      action: ActivityAction.ITINERARY_CONFIRMED,
       entityType: "ITINERARY",
       entityId: id,
-      message: `Confirmed itinerary ${id}`,
+      message: "Itinerary confirmed",
     });
     return serializeItinerary(updated);
   },
@@ -421,11 +421,11 @@ export const ItineraryService = {
       });
       await logAudit(tx, {
         actorUserId: ownerId,
-        action: "ITINERARY_COLLABORATOR_ADDED",
+        action: ActivityAction.ITINERARY_UPDATED,
         entityType: "ITINERARY",
         entityId: id,
-        metadata: { collaboratorId },
-        message: `Added collaborator ${collaboratorId} to itinerary ${id}`,
+        metadata: { collaboratorId, action: "collaborator_added" },
+        message: "Collaborator added to itinerary",
       });
       return collab;
     });
@@ -437,11 +437,11 @@ export const ItineraryService = {
     });
     await logAudit(prisma, {
       actorUserId: ownerId,
-      action: "ITINERARY_COLLABORATOR_REMOVED",
+      action: ActivityAction.ITINERARY_UPDATED,
       entityType: "ITINERARY",
       entityId: id,
-      metadata: { collaboratorId },
-      message: `Removed collaborator ${collaboratorId} from itinerary ${id}`,
+      metadata: { collaboratorId, action: "collaborator_removed" },
+      message: "Collaborator removed from itinerary",
     });
     return removed;
   },
@@ -626,11 +626,11 @@ export const ItineraryService = {
 
       await logAudit(tx, {
         actorUserId: userId,
-        action: "ITINERARY_RESTORED",
+        action: ActivityAction.ITINERARY_UPDATED,
         entityType: "ITINERARY",
         entityId: itineraryId,
-        metadata: { restoredFromVersion: version.version },
-        message: `Restored itinerary ${itineraryId} from version ${version.version}`,
+        metadata: { restoredFromVersion: version.version, action: "restored" },
+        message: "Itinerary restored from previous version",
       });
 
       return serializeItinerary(restored);

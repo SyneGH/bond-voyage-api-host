@@ -1,5 +1,5 @@
 import { prisma } from "@/config/database";
-import { logAudit } from "@/services/activity-log.service";
+import { logAudit, ActivityAction } from "@/services/activity-log.service";
 
 interface CreateFaqInput {
   question: string;
@@ -39,11 +39,11 @@ export const FaqService = {
     try {
       await logAudit(prisma, {
         actorUserId: userId,
-        action: "FAQ_CREATED",
+        action: ActivityAction.FAQ_CREATED,
         entityType: "FAQ",
         entityId: faq.id,
         metadata: { question: faq.question },
-        message: `Created FAQ: ${faq.question}`,
+        message: "FAQ created",
       });
     } catch (error) {
       console.error("⚠️ Failed to log audit for FAQ creation:", error);
@@ -72,10 +72,10 @@ export const FaqService = {
     try {
       await logAudit(prisma, {
         actorUserId: userId,
-        action: "FAQ_UPDATED",
+        action: ActivityAction.FAQ_UPDATED,
         entityType: "FAQ",
         entityId: id,
-        message: `Updated FAQ ${id}`,
+        message: "FAQ updated",
       });
     } catch (error) {
       console.error("⚠️ Failed to log audit for FAQ update:", error);
@@ -93,11 +93,11 @@ export const FaqService = {
     try {
       await logAudit(prisma, {
         actorUserId: userId,
-        action: "FAQ_DELETED",
+        action: ActivityAction.FAQ_DELETED,
         entityType: "FAQ",
         entityId: id,
         metadata: { question: existing.question },
-        message: `Deleted FAQ ${id}`,
+        message: "FAQ deleted",
       });
     } catch (error) {
       console.error("⚠️ Failed to log audit for FAQ deletion:", error);

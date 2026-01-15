@@ -187,19 +187,20 @@ export const DashboardService = {
   },
 
 async getSelfStats(year: number, userId: string) {
-    const userScope: Prisma.BookingWhereInput = {
+    // Build explicit where clauses to avoid spread operator issues with OR
+    const bookingWhereBase = {
       OR: [
         { userId },
         { itinerary: { collaborators: { some: { userId } } } },
       ],
-    };
+    } satisfies Prisma.BookingWhereInput;
 
-    const itineraryScope: Prisma.ItineraryWhereInput = {
+    const itineraryWhereBase = {
       OR: [
         { userId },
         { collaborators: { some: { userId } } },
       ],
-    };
+    } satisfies Prisma.ItineraryWhereInput;
 
     // Compute actual card values for the user
     const [travelPlans, pendingBookings, activeBookings, completedTrips] =
@@ -207,29 +208,37 @@ async getSelfStats(year: number, userId: string) {
         // Travel Plans: Count itineraries in DRAFT status (not yet converted to booking)
         prisma.itinerary.count({
           where: {
-            ...itineraryScope,
-            status: "DRAFT",
+            AND: [
+              itineraryWhereBase,
+              { status: "DRAFT" },
+            ],
           },
         }),
         // Pending: Bookings awaiting approval
         prisma.booking.count({
           where: {
-            ...userScope,
-            status: "PENDING",
+            AND: [
+              bookingWhereBase,
+              { status: "PENDING" },
+            ],
           },
         }),
         // Active Bookings: Confirmed bookings
         prisma.booking.count({
           where: {
-            ...userScope,
-            status: "CONFIRMED",
+            AND: [
+              bookingWhereBase,
+              { status: "CONFIRMED" },
+            ],
           },
         }),
         // Completed Trips: Finished bookings
         prisma.booking.count({
           where: {
-            ...userScope,
-            status: "COMPLETED",
+            AND: [
+              bookingWhereBase,
+              { status: "COMPLETED" },
+            ],
           },
         }),
       ]);
@@ -244,11 +253,15 @@ async getSelfStats(year: number, userId: string) {
 
     const bookingsInYear = await prisma.booking.findMany({
       where: {
-        ...userScope,
-        startDate: {
-          gte: yearStart,
-          lt: nextYearStart,
-        },
+        AND: [
+          bookingWhereBase,
+          {
+            startDate: {
+              gte: yearStart,
+              lt: nextYearStart,
+            },
+          },
+        ],
       },
       select: { startDate: true },
     });
@@ -274,8 +287,10 @@ async getSelfStats(year: number, userId: string) {
       by: ["status"],
       _count: { _all: true },
       where: {
-        ...userScope,
-        status: { in: ACTIVE_STATUSES },
+        AND: [
+          bookingWhereBase,
+          { status: { in: ACTIVE_STATUSES } },
+        ],
       },
     });
 
@@ -318,8 +333,10 @@ async getSelfStats(year: number, userId: string) {
       by: ["type"],
       _count: { _all: true },
       where: {
-        ...userScope,
-        status: { in: ACTIVE_STATUSES },
+        AND: [
+          bookingWhereBase,
+          { status: { in: ACTIVE_STATUSES } },
+        ],
       },
     });
 

@@ -1,6 +1,6 @@
 import { prisma } from "@/config/database";
 import { InquiryStatus } from "@prisma/client";
-import { logAudit } from "@/services/activity-log.service";
+import { logAudit, ActivityAction } from "@/services/activity-log.service";
 import { NotificationService } from "@/services/notification.service";
 
 export const InquiryService = {
@@ -57,11 +57,11 @@ export const InquiryService = {
 
       await logAudit(tx, {
         actorUserId: userId,
-        action: "INQUIRY_CREATED",
+        action: ActivityAction.INQUIRY_CREATED,
         entityType: "INQUIRY",
         entityId: inquiry.id,
-        metadata: { bookingId: inquiry.bookingId ?? undefined },
-        message: `Created inquiry ${inquiry.id}`,
+        metadata: { bookingId: inquiry.bookingId ?? undefined, subject },
+        message: "Inquiry submitted",
       });
 
       return inquiry;
@@ -128,11 +128,11 @@ export const InquiryService = {
 
     await logAudit(prisma, {
       actorUserId: senderId,
-      action: "INQUIRY_MESSAGE_SENT",
+      action: ActivityAction.INQUIRY_MESSAGE_SENT,
       entityType: "INQUIRY",
       entityId: inquiryId,
       metadata: { isAdmin },
-      message: `Sent inquiry message for inquiry ${inquiryId}`,
+      message: isAdmin ? "Reply sent to inquiry" : "Message sent",
     });
 
     if (isAdmin) {
