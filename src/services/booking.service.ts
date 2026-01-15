@@ -1091,7 +1091,8 @@ export const BookingService = {
       const allowedTransitions: Record<BookingStatus, BookingStatus[]> = {
         DRAFT: ["PENDING", "CANCELLED"],
         PENDING: ["CONFIRMED", "REJECTED", "CANCELLED"],
-        CONFIRMED: ["COMPLETED", "CANCELLED"],
+        CONFIRMED: ["BOOKED", "COMPLETED", "CANCELLED"],
+        BOOKED: ["COMPLETED", "CANCELLED"],
         REJECTED: ["PENDING", "CANCELLED"],
         COMPLETED: [],
         CANCELLED: [],
