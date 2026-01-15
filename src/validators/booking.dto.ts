@@ -249,6 +249,7 @@ export const updateItineraryDto = z
     isResolved: z.boolean().optional(),
     rejectionReason: z.string().optional().nullable(),
     rejectionResolution: z.string().optional().nullable(),
+    sendStatus: z.string().optional(),
     itinerary: z
       .union([
         z.array(updateDayDto),

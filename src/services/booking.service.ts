@@ -209,6 +209,7 @@ interface UpdateBookingItineraryDTO {
   isResolved?: boolean;
   rejectionReason?: string | null;
   rejectionResolution?: string | null;
+  sendStatus?: string;
   itinerary?: unknown;
   /*
   itinerary: {
@@ -1008,6 +1009,7 @@ export const BookingService = {
           ...(data.customerName !== undefined && { customerName: data.customerName }),
           ...(data.customerEmail !== undefined && { customerEmail: data.customerEmail }),
           ...(data.customerMobile !== undefined && { customerMobile: data.customerMobile }),
+          ...(data.sendStatus !== undefined && { sendStatus: data.sendStatus }),
         },
       });
 
