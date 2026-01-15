@@ -243,6 +243,7 @@ export const updateItineraryDto = z
       "REJECTED",
       "COMPLETED",
       "CANCELLED",
+      "BOOKED",
     ]).optional(),
     tourType: tourTypeSchema.optional(),
     isResolved: z.boolean().optional(),
@@ -276,6 +277,7 @@ export const updateStatusDto = z
       "REJECTED",
       "COMPLETED",
       "CANCELLED",
+      "BOOKED",
     ]),
     rejectionReason: z.string().optional(),
     rejectionResolution: z.string().optional(),
@@ -315,7 +317,7 @@ export const bookingListQueryDto = z.object({
   page: z.preprocess((val) => parseNumber(val, 1), z.number().int().min(1)),
   limit: z.preprocess((val) => parseNumber(val, 10), z.number().int().min(1)),
   status: z
-    .enum(["DRAFT", "PENDING", "CONFIRMED", "REJECTED", "COMPLETED", "CANCELLED"])
+    .enum(["DRAFT", "PENDING", "CONFIRMED", "REJECTED", "COMPLETED", "CANCELLED", "BOOKED"])
     .optional(),
 });
 
@@ -325,7 +327,7 @@ export const bookingAdminListQueryDto = z.object({
   page: z.preprocess((val) => parseNumber(val, 1), z.number().int().min(1)),
   limit: z.preprocess((val) => parseNumber(val, 10), z.number().int().min(1)),
   status: z
-    .enum(["DRAFT", "PENDING", "CONFIRMED", "REJECTED", "COMPLETED", "CANCELLED"])
+    .enum(["DRAFT", "PENDING", "CONFIRMED", "REJECTED", "COMPLETED", "CANCELLED", "BOOKED"])
     .optional(),
   type: z.enum(["STANDARD", "CUSTOMIZED", "REQUESTED"]).optional(),
   dateFrom: dateQuerySchema,
