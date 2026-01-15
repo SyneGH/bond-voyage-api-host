@@ -360,7 +360,6 @@ export const BookingService = {
         data.type === BookingType.REQUESTED ||
         data.itinerary?.type === ItineraryType.REQUESTED;
       const canTargetUser =
-        isRequested &&
         data.role === Role.ADMIN &&
         data.targetUserId &&
         data.targetUserId !== data.userId;
@@ -391,7 +390,7 @@ export const BookingService = {
 
         const itinerary = await tx.itinerary.create({
           data: {
-            userId: data.userId,
+            userId: resolvedTargetUserId,
             title:
               data.destination && data.destination.trim().length > 0
                 ? `Smart Trip: ${data.destination}`
@@ -458,7 +457,7 @@ export const BookingService = {
         const booking = await tx.booking.create({
           data: {
             bookingCode,
-            userId: isRequested ? resolvedTargetUserId : data.userId,
+            userId: resolvedTargetUserId,
             itineraryId: itinerary.id,
             destination: itinerary.destination,
             startDate: startDate ?? undefined,
@@ -493,22 +492,8 @@ export const BookingService = {
           message: "Booking created",
         });
 
-        await NotificationService.create(
-          {
-            userId: booking.userId,
-            type: "BOOKING",
-            title: "Booking created",
-            message: `Your booking to ${booking.destination} has been created.`,
-            data: {
-              bookingId: booking.id,
-              bookingCode: booking.bookingCode,
-              status: booking.status,
-              itineraryId: booking.itineraryId,
-              destination: booking.destination ?? undefined,
-            },
-          },
-          tx
-        );
+        // NOTE: Notifications only for transaction processes (USER <-> ADMIN)
+        // Booking creation is logged in activity logs, not notified
 
         await NotificationService.notifyAdmins({
           type: "BOOKING",
@@ -547,7 +532,7 @@ export const BookingService = {
         // Create itinerary from tour package
         const itinerary = await tx.itinerary.create({
           data: {
-            userId: isRequested ? resolvedTargetUserId : data.userId,
+            userId: resolvedTargetUserId,
             title: tourPackage.title,
             destination: tourPackage.destination,
             startDate,
@@ -597,7 +582,7 @@ export const BookingService = {
         const booking = await tx.booking.create({
           data: {
             bookingCode,
-            userId: isRequested ? resolvedTargetUserId : data.userId,
+            userId: resolvedTargetUserId,
             itineraryId: itinerary.id,
             destination: itinerary.destination,
             startDate: startDate ?? undefined,
@@ -633,22 +618,8 @@ export const BookingService = {
           message: "Booking created",
         });        
 
-        await NotificationService.create(
-          {
-            userId: booking.userId,
-            type: "BOOKING",
-            title: "Booking created",
-            message: `Your booking for ${tourPackage.title} has been created.`,
-            data: {
-              bookingId: booking.id,
-              bookingCode: booking.bookingCode,
-              status: booking.status,
-              itineraryId: booking.itineraryId,
-              destination: booking.destination ?? undefined,
-            },
-          },
-          tx
-        );
+        // NOTE: Notifications only for transaction processes (USER <-> ADMIN)
+        // Booking creation is logged in activity logs, not notified
 
         await NotificationService.notifyAdmins({
           type: "BOOKING",
@@ -672,7 +643,7 @@ export const BookingService = {
         ? await tx.itinerary.create({
             // Deprecated inline creation path; kept for backward compatibility with legacy clients
             data: {
-              userId: isRequested ? resolvedTargetUserId : data.userId,
+              userId: resolvedTargetUserId,
               title: data.itinerary?.title ?? "Itinerary",
               destination: data.itinerary?.destination ?? "",
 
@@ -753,7 +724,7 @@ export const BookingService = {
       const booking = await tx.booking.create({
         data: {
           bookingCode,
-          userId: isRequested ? resolvedTargetUserId : data.userId,
+          userId: resolvedTargetUserId,
           itineraryId: itinerary.id,
           destination: itinerary.destination,
           startDate: itinerary.startDate ?? undefined,  // ✅ undefined for optional Date
@@ -798,22 +769,8 @@ export const BookingService = {
         message: "Booking created",
       });
 
-      await NotificationService.create(
-        {
-          userId: booking.userId,
-          type: "BOOKING",
-          title: "Booking created",
-          message: `Your booking to ${booking.destination} has been created.`,
-          data: {
-            bookingId: booking.id,
-            bookingCode: booking.bookingCode,
-            status: booking.status,
-            itineraryId: booking.itineraryId,
-            destination: booking.destination ?? undefined,
-          },
-        },
-        tx
-      );
+      // NOTE: Notifications only for transaction processes (USER <-> ADMIN)
+      // Booking creation is logged in activity logs, not notified
 
       await NotificationService.notifyAdmins({
         type: "BOOKING",
@@ -1502,16 +1459,10 @@ export const BookingService = {
         metadata: { status: updated.status, action: "submitted" },
         message: "Booking submitted for approval",
       });
-      await NotificationService.create(
-        {
-          userId,
-          type: "BOOKING",
-          title: "Booking submitted",
-          message: `Your booking ${bookingId} has been submitted for approval.`,
-          data: { bookingId },
-        },
-        tx
-      );
+      // NOTE: Notifications only for transaction processes (USER <-> ADMIN)
+      // Notify admin for booking approval - this is a transaction requiring admin action
+      // User doesn't need notification for their own submission
+
       await NotificationService.notifyAdmins({
         type: "BOOKING",
         title: "Booking Submitted",
