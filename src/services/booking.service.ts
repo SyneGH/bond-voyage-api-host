@@ -957,6 +957,7 @@ export const BookingService = {
               travelers,
               type: itineraryType,
               tourType,
+              version: { increment: 1 },
             },
           });
         }
@@ -1843,5 +1844,46 @@ export const BookingService = {
 
       return removed;
     });
+  },
+
+  async getVersionHistory(bookingId: string, userId: string, userRole: string) {
+    const booking = await prisma.booking.findUnique({
+      where: { id: bookingId },
+      include: {
+        itinerary: {
+          include: {
+            collaborators: true,
+          },
+        },
+      },
+    });
+
+    if (!booking) {
+      throw new Error("BOOKING_NOT_FOUND");
+    }
+
+    const isOwner = booking.userId === userId;
+    const isAdmin = userRole === "ADMIN";
+    const isCollaborator = booking.itinerary?.collaborators?.some(
+      (c) => c.userId === userId
+    );
+
+    if (!isOwner && !isAdmin && !isCollaborator) {
+      throw new Error("BOOKING_FORBIDDEN");
+    }
+
+    if (!booking.itineraryId) {
+      return [];
+    }
+
+    const versions = await prisma.itineraryVersion.findMany({
+      where: { itineraryId: booking.itineraryId },
+      include: {
+        createdBy: { select: { firstName: true, lastName: true } },
+      },
+      orderBy: { version: "asc" },
+    });
+
+    return versions;
   },
 };

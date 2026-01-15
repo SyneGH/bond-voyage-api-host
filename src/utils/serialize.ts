@@ -253,12 +253,16 @@ export const serializeVersion = (version: ItineraryVersionWithUser) => {
     // We default to the structure your frontend expects if fields are missing
     bookingData: snapshotData.bookingData || {
       destination: snapshotData.destination || "",
-      travelers: snapshotData.travelers || "1",
+      travelers: String(snapshotData.travelers || "1"),
       travelDateFrom: snapshotData.startDate || "",
       travelDateTo: snapshotData.endDate || "",
-      totalAmount: snapshotData.estimatedCost || "0"
+      totalPrice: String(snapshotData.estimatedCost || "0")
     },
-    itineraryDays: snapshotData.days || [],
+    itineraryDays: (snapshotData.days || []).map((day: any) => ({
+      ...day,
+      // Ensure dayNumber exists for frontend compatibility
+      dayNumber: day.dayNumber ?? day.day ?? 1,
+    })),
     
     // Optional label
     label: `Version ${version.version}`

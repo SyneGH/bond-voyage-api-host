@@ -7,6 +7,7 @@ import {
   createItineraryDto,
   itineraryIdParamDto,
   itineraryListQueryDto,
+  itineraryShareTokenParamDto,
   itineraryVersionParamDto,
   restoreItineraryDto,
   updateItineraryDtoV2,
@@ -238,6 +239,87 @@ export const ItineraryController = {
       }
       if (error?.message === "ITINERARY_FORBIDDEN") {
         throwError(HTTP_STATUS.FORBIDDEN, "Forbidden");
+      }
+      if (error instanceof AppError) {
+        throw error;
+      }
+      throwError(HTTP_STATUS.INTERNAL_SERVER_ERROR, "Internal Server Error", error);
+    }
+  },
+
+  createShare: async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const { id } = itineraryIdParamDto.parse(req.params);
+      const authUser = requireAuthUser(req);
+      const share = await ItineraryService.createShare(id, authUser.userId);
+      createResponse(res, HTTP_STATUS.CREATED, "Share token created", {
+        token: share.token,
+      });
+    } catch (error: any) {
+      if (error instanceof ZodError) {
+        throwError(HTTP_STATUS.BAD_REQUEST, "Validation failed", error.errors);
+      }
+      if (error?.message === "ITINERARY_FORBIDDEN") {
+        throwError(HTTP_STATUS.FORBIDDEN, "Forbidden");
+      }
+      if (error?.message === "ITINERARY_NOT_FOUND") {
+        throwError(HTTP_STATUS.NOT_FOUND, "Itinerary not found");
+      }
+      if (error?.message === "SHARE_TOKEN_CONFLICT") {
+        throwError(HTTP_STATUS.CONFLICT, "Unable to generate share token");
+      }
+      if (error instanceof AppError) {
+        throw error;
+      }
+      throwError(HTTP_STATUS.INTERNAL_SERVER_ERROR, "Internal Server Error", error);
+    }
+  },
+
+  acceptShare: async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const { token } = itineraryShareTokenParamDto.parse(req.params);
+      const authUser = requireAuthUser(req);
+      const result = await ItineraryService.acceptShare(token, authUser.userId);
+      if (result.status === "ALREADY_COLLABORATOR") {
+        createResponse(res, HTTP_STATUS.OK, "Already a collaborator");
+        return;
+      }
+      createResponse(res, HTTP_STATUS.OK, "Joined itinerary", result.collaborator);
+    } catch (error: any) {
+      if (error instanceof ZodError) {
+        throwError(HTTP_STATUS.BAD_REQUEST, "Validation failed", error.errors);
+      }
+      if (error?.message === "SHARE_NOT_FOUND") {
+        throwError(HTTP_STATUS.NOT_FOUND, "Share token not found");
+      }
+      if (error?.message === "SHARE_REVOKED") {
+        throwError(HTTP_STATUS.CONFLICT, "Share token revoked");
+      }
+      if (error?.message === "SHARE_MAX_USES") {
+        throwError(HTTP_STATUS.CONFLICT, "Share token reached max collaborators");
+      }
+      if (error instanceof AppError) {
+        throw error;
+      }
+      throwError(HTTP_STATUS.INTERNAL_SERVER_ERROR, "Internal Server Error", error);
+    }
+  },
+
+  revokeShare: async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const { token } = itineraryShareTokenParamDto.parse(req.params);
+      const authUser = requireAuthUser(req);
+      await ItineraryService.revokeShare(token, authUser.userId);
+      createResponse(res, HTTP_STATUS.OK, "Share token revoked");
+    } catch (error: any) {
+      if (error instanceof ZodError) {
+        throwError(HTTP_STATUS.BAD_REQUEST, "Validation failed", error.errors);
+      }
+      if (error?.message === "ITINERARY_FORBIDDEN") {
+        throwError(HTTP_STATUS.FORBIDDEN, "Forbidden");
+      }
+      if (error?.message === "SHARE_NOT_FOUND") {
+        throwError(HTTP_STATUS.NOT_FOUND, "Share token not found");
       }
       if (error instanceof AppError) {
         throw error;

@@ -132,6 +132,7 @@ model User {
   itineraries           Itinerary[]
   collaborations        ItineraryCollaborator[]
   invitedCollaborations ItineraryCollaborator[] @relation("itinerary_invites")
+  createdItineraryShares ItineraryShare[]
   feedback              Feedback[]
   respondedFeedback     Feedback[]              @relation("feedback_responses")
   activityLogs          ActivityLog[]
@@ -201,6 +202,7 @@ model Itinerary {
 
   days          ItineraryDay[]
   collaborators ItineraryCollaborator[]
+  shares        ItineraryShare[]
   bookings      Booking[]
   inquiries     Inquiry[]
   versions      ItineraryVersion[]
@@ -275,6 +277,22 @@ model ItineraryCollaborator {
 
   @@unique([itineraryId, userId])
   @@map("itinerary_collaborators")
+}
+
+model ItineraryShare {
+  id          String           @id @default(uuid())
+  token       String           @unique @db.VarChar(8)
+  itineraryId String
+  itinerary   Itinerary        @relation(fields: [itineraryId], references: [id], onDelete: Cascade)
+  createdById String
+  createdBy   User             @relation(fields: [createdById], references: [id], onDelete: Cascade)
+  role        CollaboratorRole @default(COLLABORATOR)
+  maxUses     Int              @default(5)
+  uses        Int              @default(0)
+  revokedAt   DateTime?
+  createdAt   DateTime         @default(now())
+
+  @@map("itinerary_shares")
 }
 
 // =========================================

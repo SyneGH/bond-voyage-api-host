@@ -20,7 +20,7 @@ import { addCollaboratorDto } from "@/validators/collaboration.dto";
 import userService from "@/services/user.service";
 import { requireAuthUser } from "@/utils/requestGuards";
 import { bookingPaymentListQueryDto } from "@/validators/payment.dto";
-import { serializeBooking } from "@/utils/serialize";
+import { serializeBooking, serializeVersion } from "@/utils/serialize";
 
 export const BookingController = {
   // POST /api/bookings
@@ -752,6 +752,44 @@ export const BookingController = {
       throwError(
         HTTP_STATUS.INTERNAL_SERVER_ERROR,
         "Failed to remove collaborator",
+        error
+      );
+    }
+  },
+
+  // GET /api/bookings/:id/versions
+  getVersionHistory: async (
+    req: AuthenticatedRequest,
+    res: Response
+  ): Promise<void> => {
+    try {
+      const { id } = bookingIdParamDto.parse(req.params);
+      const authUser = requireAuthUser(req);
+
+      const versions = await BookingService.getVersionHistory(
+        id,
+        authUser.userId,
+        authUser.role
+      );
+
+      const serialized = versions.map(serializeVersion);
+      createResponse(res, HTTP_STATUS.OK, "Version history retrieved", serialized);
+    } catch (error: any) {
+      if (error instanceof ZodError) {
+        throwError(HTTP_STATUS.BAD_REQUEST, "Validation failed", error.errors);
+      }
+      if (error instanceof AppError) {
+        throw error;
+      }
+      if (error?.message === "BOOKING_NOT_FOUND") {
+        throwError(HTTP_STATUS.NOT_FOUND, "Booking not found");
+      }
+      if (error?.message === "BOOKING_FORBIDDEN") {
+        throwError(HTTP_STATUS.FORBIDDEN, "Access denied");
+      }
+      throwError(
+        HTTP_STATUS.INTERNAL_SERVER_ERROR,
+        "Failed to retrieve version history",
         error
       );
     }

@@ -1,4 +1,5 @@
 import {
+  CollaboratorRole,
   ItineraryStatus,
   ItineraryType,
   Prisma,
@@ -6,6 +7,7 @@ import {
   TourType,
   UserRole,
 } from "@prisma/client";
+import crypto from "crypto";
 import { prisma } from "@/config/database";
 import { serializeItinerary, toISO } from "@/utils/serialize";
 import { logAudit, ActivityAction } from "@/services/activity-log.service";
@@ -43,6 +45,40 @@ const itineraryIncludes: Prisma.ItineraryInclude = {
     },
   },
   days: { include: { activities: true }, orderBy: { dayNumber: "asc" } },
+};
+
+const SHARE_TOKEN_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+const SHARE_TOKEN_LENGTH = 8;
+const SHARE_TOKEN_MAX_USES = 5;
+
+const generateShareToken = () => {
+  let token = "";
+  const alphabetLength = SHARE_TOKEN_ALPHABET.length;
+  const maxValue = Math.floor(256 / alphabetLength) * alphabetLength;
+
+  while (token.length < SHARE_TOKEN_LENGTH) {
+    const bytes = crypto.randomBytes(SHARE_TOKEN_LENGTH);
+    for (const byte of bytes) {
+      if (byte >= maxValue) continue;
+      token += SHARE_TOKEN_ALPHABET[byte % alphabetLength];
+      if (token.length === SHARE_TOKEN_LENGTH) break;
+    }
+  }
+
+  return token;
+};
+
+const generateUniqueShareToken = async (tx: Prisma.TransactionClient) => {
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const token = generateShareToken();
+    const existing = await tx.itineraryShare.findUnique({
+      where: { token },
+      select: { id: true },
+    });
+    if (!existing) return token;
+  }
+
+  throw new Error("SHARE_TOKEN_CONFLICT");
 };
 
 type ItinerarySnapshot = {
@@ -444,6 +480,129 @@ export const ItineraryService = {
       message: "Collaborator removed from itinerary",
     });
     return removed;
+  },
+
+  async createShare(itineraryId: string, ownerId: string) {
+    return prisma.$transaction(async (tx) => {
+      const itinerary = await tx.itinerary.findUnique({
+        where: { id: itineraryId },
+        select: { id: true, userId: true },
+      });
+
+      if (!itinerary) {
+        throw new Error("ITINERARY_NOT_FOUND");
+      }
+
+      if (itinerary.userId !== ownerId) {
+        throw new Error("ITINERARY_FORBIDDEN");
+      }
+
+      const token = await generateUniqueShareToken(tx);
+
+      const share = await tx.itineraryShare.create({
+        data: {
+          token,
+          itineraryId,
+          createdById: ownerId,
+          role: CollaboratorRole.COLLABORATOR,
+          maxUses: SHARE_TOKEN_MAX_USES,
+        },
+      });
+
+      await logAudit(tx, {
+        actorUserId: ownerId,
+        action: ActivityAction.ITINERARY_UPDATED,
+        entityType: "ITINERARY",
+        entityId: itineraryId,
+        metadata: { action: "share_created", token: share.token },
+        message: "Itinerary share created",
+      });
+
+      return share;
+    });
+  },
+
+  async acceptShare(token: string, userId: string) {
+    return prisma.$transaction(async (tx) => {
+      const share = await tx.itineraryShare.findUnique({
+        where: { token },
+        include: {
+          itinerary: {
+            select: {
+              id: true,
+              userId: true,
+              collaborators: { select: { userId: true } },
+            },
+          },
+        },
+      });
+
+      if (!share) {
+        throw new Error("SHARE_NOT_FOUND");
+      }
+
+      const isOwner = share.itinerary.userId === userId;
+      const isCollaborator = share.itinerary.collaborators.some(
+        (collab) => collab.userId === userId
+      );
+
+      if (isOwner || isCollaborator) {
+        return { collaborator: null, status: "ALREADY_COLLABORATOR" };
+      }
+
+      if (share.revokedAt) {
+        throw new Error("SHARE_REVOKED");
+      }
+
+      if (share.uses >= share.maxUses) {
+        throw new Error("SHARE_MAX_USES");
+      }
+
+      const collaborator = await tx.itineraryCollaborator.create({
+        data: {
+          itineraryId: share.itineraryId,
+          userId,
+          invitedById: share.createdById,
+          role: share.role,
+        },
+      });
+
+      await tx.itineraryShare.update({
+        where: { token },
+        data: { uses: { increment: 1 } },
+      });
+
+      await logAudit(tx, {
+        actorUserId: userId,
+        action: ActivityAction.ITINERARY_UPDATED,
+        entityType: "ITINERARY",
+        entityId: share.itineraryId,
+        metadata: { action: "share_accepted", token },
+        message: "Itinerary share accepted",
+      });
+
+      return { collaborator, status: "ADDED" };
+    });
+  },
+
+  async revokeShare(token: string, ownerId: string) {
+    const share = await prisma.itineraryShare.findUnique({
+      where: { token },
+      select: { id: true, createdById: true },
+    });
+
+    if (!share) {
+      throw new Error("SHARE_NOT_FOUND");
+    }
+
+    if (share.createdById !== ownerId) {
+      throw new Error("ITINERARY_FORBIDDEN");
+    }
+
+    return prisma.itineraryShare.update({
+      where: { token },
+      data: { revokedAt: new Date() },
+    });
   },
 
   async listCollaborators(id: string, viewerId: string) {

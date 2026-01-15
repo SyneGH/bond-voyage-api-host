@@ -35,11 +35,20 @@ const dateSchema = z.preprocess((value) => {
   return value;
 }, z.date());
 
+const locationDataDto = z.object({
+  name: z.string().optional(),
+  address: z.string().optional(),
+  lat: z.number().optional(),
+  lng: z.number().optional(),
+  source: z.string().optional(),
+}).optional().nullable();
+
 const activityDto = z.object({
-  time: z.string().min(1),
-  title: z.string().min(1),
+  time: z.string().optional().default(""),
+  title: z.string().optional().default(""),
   description: z.string().optional().nullable(),
   location: z.string().optional().nullable(),
+  locationData: locationDataDto,
   icon: z.string().optional().nullable(),
   order: z.number().int().min(0),
 });

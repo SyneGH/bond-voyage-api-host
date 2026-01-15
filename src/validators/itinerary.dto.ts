@@ -69,6 +69,15 @@ export const itineraryIdParamDto = z.object({
   id: z.string().uuid(),
 });
 
+const shareTokenSchema = z.preprocess(
+  (value) => (typeof value === "string" ? value.trim().toUpperCase() : value),
+  z.string().regex(/^[A-HJ-NP-Z2-9]{8}$/)
+);
+
+export const itineraryShareTokenParamDto = z.object({
+  token: shareTokenSchema,
+});
+
 export const collaboratorParamDto = z.object({
   userId: z.string().uuid(),
 });

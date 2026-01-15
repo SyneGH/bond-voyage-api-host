@@ -1,6 +1,7 @@
 # Node.js Prisma Authentication Boilerplate
 
 A robust Node.js authentication boilerplate with TypeScript, Prisma ORM, PostgreSQL, Redis caching, and JWT authentication.
+AI agents: always read `AGENTS.md` first.
 
 ## 🚀 Features
 

@@ -35,6 +35,9 @@ router.delete("/:id", asyncHandler(BookingController.deleteDraft));
 // USER/ADMIN: detail
 router.get("/:id", asyncHandler(BookingController.getOne));
 
+// USER: version history
+router.get("/:id/versions", asyncHandler(BookingController.getVersionHistory));
+
 // ADMIN: list all (with optional status filter)
 router.get(
   "/admin/bookings",

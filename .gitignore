@@ -6,3 +6,10 @@ build/
 .DS_Store
 *.tsbuildinfo
 .env
+AGENTS.md
+bond-voyage-finals.code-workspace
+nul
+.claude/settings.local.json
+tests/smoke/client.http
+Collaborative Backend Logs.txt
+tests/smoke/client.http

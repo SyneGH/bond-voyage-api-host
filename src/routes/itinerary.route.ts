@@ -9,6 +9,9 @@ router.use(authenticate);
 
 router.post("/", asyncHandler(ItineraryController.create));
 router.get("/", asyncHandler(ItineraryController.listMine));
+router.post("/shares/:token/accept", asyncHandler(ItineraryController.acceptShare));
+router.patch("/shares/:token/revoke", asyncHandler(ItineraryController.revokeShare));
+router.post("/:id/shares", asyncHandler(ItineraryController.createShare));
 router.get("/:id/versions", asyncHandler(ItineraryController.listVersions));
 router.get(
   "/:id/versions/:versionId",
