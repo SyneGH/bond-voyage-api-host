@@ -59,6 +59,7 @@ enum BookingStatus {
   REJECTED // Returned to user for changes
   COMPLETED // Trip finished
   CANCELLED // Terminated
+  BOOKED
 }
 
 enum TourType {
