@@ -58,6 +58,51 @@ export const NotificationController = {
     }
   },
 
+  markUnread: async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const authUser = requireAuthUser(req);
+      const { id } = notificationIdParamDto.parse(req.params);
+      await NotificationService.markUnread(id, authUser.userId);
+      createResponse(res, HTTP_STATUS.OK, "Notification marked as unread");
+    } catch (error) {
+      if (error instanceof ZodError) {
+        throwError(HTTP_STATUS.BAD_REQUEST, "Validation failed", error.errors);
+      }
+      if (error instanceof AppError) {
+        throw error;
+      }
+      throwError(
+        HTTP_STATUS.INTERNAL_SERVER_ERROR,
+        "Failed to update notification",
+        error
+      );
+    }
+  },
+
+  deleteOne: async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    try {
+      const authUser = requireAuthUser(req);
+      const { id } = notificationIdParamDto.parse(req.params);
+      const count = await NotificationService.deleteOne(id, authUser.userId);
+      if (count === 0) {
+        throwError(HTTP_STATUS.NOT_FOUND, "Notification not found");
+      }
+      createResponse(res, HTTP_STATUS.OK, "Notification deleted");
+    } catch (error) {
+      if (error instanceof ZodError) {
+        throwError(HTTP_STATUS.BAD_REQUEST, "Validation failed", error.errors);
+      }
+      if (error instanceof AppError) {
+        throw error;
+      }
+      throwError(
+        HTTP_STATUS.INTERNAL_SERVER_ERROR,
+        "Failed to delete notification",
+        error
+      );
+    }
+  },
+
   markAllRead: async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     try {
       const authUser = requireAuthUser(req);

@@ -91,6 +91,21 @@ export const NotificationService = {
     return result.count;
   },
 
+  async markUnread(notificationId: string, userId: string) {
+    const result = await prisma.notification.updateMany({
+      where: { id: notificationId, userId },
+      data: { isRead: false },
+    });
+    return result.count;
+  },
+
+  async deleteOne(notificationId: string, userId: string) {
+    const result = await prisma.notification.deleteMany({
+      where: { id: notificationId, userId },
+    });
+    return result.count;
+  },
+
   async markAllRead(userId: string) {
     await prisma.notification.updateMany({ where: { userId, isRead: false }, data: { isRead: true } });
   },
