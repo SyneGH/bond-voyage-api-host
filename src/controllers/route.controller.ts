@@ -111,7 +111,6 @@ export const RouteController = {
       // STEP 4: Calculate savings
       // ========================================
       const distanceSaved = Math.max(0, originalDistance - optimizedDistance);
-      const timeSaved = Math.max(0, originalTime - optimizedTime);
 
       // ========================================
       // STEP 5: Return comprehensive response
@@ -124,7 +123,6 @@ export const RouteController = {
         optimizedDistance: Math.round(optimizedDistance / 1000 * 10) / 10, // km, 1 decimal
         kilometerSaved: Math.round(distanceSaved / 1000 * 10) / 10, // km, 1 decimal
         totalTime: Math.round(optimizedTime / 60), // minutes
-        timeSaved: Math.round(timeSaved / 60), // minutes
         matrixSummary: totalsFromMatrix,
       });
     } catch (error) {
