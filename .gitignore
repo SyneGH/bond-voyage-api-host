@@ -12,4 +12,3 @@ nul
 .claude/settings.local.json
 tests/smoke/client.http
 Collaborative Backend Logs.txt
-tests/smoke/client.http

@@ -339,8 +339,19 @@ export const ItineraryService = {
 
       if (!updated) return null;
 
-      await tx.itineraryVersion.create({
-        data: {
+      // Use upsert to avoid duplicate version creation on retries or race conditions
+      await tx.itineraryVersion.upsert({
+        where: {
+          itineraryId_version: {
+            itineraryId: id,
+            version: updated.version,
+          },
+        },
+        update: {
+          snapshot: buildSnapshot({ ...updated, days: updated.days }),
+          createdById: userId,
+        },
+        create: {
           itineraryId: id,
           version: updated.version,
           snapshot: buildSnapshot({ ...updated, days: updated.days }),
@@ -774,8 +785,19 @@ export const ItineraryService = {
 
       if (!restored) return null;
 
-      await tx.itineraryVersion.create({
-        data: {
+      // Use upsert to avoid duplicate version creation on retries or race conditions
+      await tx.itineraryVersion.upsert({
+        where: {
+          itineraryId_version: {
+            itineraryId,
+            version: restored.version,
+          },
+        },
+        update: {
+          snapshot: buildSnapshot({ ...restored, days: restored.days }),
+          createdById: userId,
+        },
+        create: {
           itineraryId,
           version: restored.version,
           snapshot: buildSnapshot({ ...restored, days: restored.days }),

@@ -1002,9 +1002,20 @@ export const BookingService = {
         include: { collaborators: true, days: { include: { activities: true } } },
       });
 
-      if (refreshedItinerary) {
-        await tx.itineraryVersion.create({
-          data: {
+      if (refreshedItinerary && itineraryData) {
+        // Use upsert to avoid duplicate version creation on retries or race conditions
+        await tx.itineraryVersion.upsert({
+          where: {
+            itineraryId_version: {
+              itineraryId: refreshedItinerary.id,
+              version: refreshedItinerary.version,
+            },
+          },
+          update: {
+            snapshot: buildItinerarySnapshot(refreshedItinerary),
+            createdById: userId,
+          },
+          create: {
             itineraryId: refreshedItinerary.id,
             version: refreshedItinerary.version,
             snapshot: buildItinerarySnapshot(refreshedItinerary),
