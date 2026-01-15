@@ -63,22 +63,9 @@ export const PaymentService = {
         },
         message: "Payment submitted",
       });
-      await NotificationService.create(
-        {
-          userId: data.userId,
-          type: "PAYMENT",
-          title: "Payment submitted",
-          message: `Your payment for booking ${booking.bookingCode ?? booking.id} has been submitted.`,
-          data: {
-            bookingId: booking.id,
-            bookingCode: booking.bookingCode ?? undefined,
-            paymentId: payment.id,
-            status: payment.status,
-            amount: Number(data.amount),
-          },
-        },
-        tx
-      );
+      // NOTE: Notifications only for transaction processes (USER <-> ADMIN)
+      // Payment submission notifies ADMIN for verification (transaction starts here)
+      // User will be notified when admin verifies/rejects (transaction completes)
 
       await NotificationService.notifyAdmins({
         type: "PAYMENT",

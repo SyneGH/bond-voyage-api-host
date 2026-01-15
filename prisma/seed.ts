@@ -260,6 +260,8 @@ async function main() {
   });
 
   // --- NOTIFICATIONS ---
+  // NOTE: Notifications only for transactions USER <-> ADMIN
+  // Seed example: Admin gets notified when user submits booking for approval
   await prisma.notification.deleteMany({ where: { userId: admin.id, type: NotificationType.BOOKING } });
 
   await prisma.notification.create({

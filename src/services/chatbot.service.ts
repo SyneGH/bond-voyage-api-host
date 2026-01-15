@@ -363,8 +363,56 @@ function normalizeRoamanResponse(
   };
 }
 
-// NEW: Helper function to determine actions based on user query
-function determineActions(question: string): ChatAction[] {
+const pageLabelMap: Record<string, string> = {
+  "/user/travels": "My Travels",
+  "/user/bookings": "My Bookings",
+  "/user/history": "Travel History",
+  "/user/profile/edit": "Edit Profile",
+  "/user/feedback": "Give Feedback",
+  "/user/notifications": "Notifications",
+  "/user/weather": "Check Weather",
+  "/user/standard-itinerary": "Standard Itinerary",
+  "/user/requested-itinerary": "Request Itinerary",
+  "/user/customized-itinerary": "Custom Itinerary",
+  "/user/smart-trip": "Smart Trip AI",
+  "/user/create-new-travel": "Create Travel",
+  "/user/home": "Dashboard",
+  "/user/payments": "My Payments",
+  "/user/inquiry": "Inquiry",
+};
+
+/**
+ * Builds navigation actions from FAQ targetPages.
+ * Dynamically generates a label even if path is not in pageLabelMap (future-proofing).
+ */
+function buildTargetPageActions(targetPages: string[]): ChatAction[] {
+  const uniquePages = Array.from(new Set(targetPages.filter(Boolean)));
+  return uniquePages.map((path) => {
+    // Use map if exists, otherwise generate a readable label from the path
+    let label = pageLabelMap[path];
+    if (!label) {
+      // e.g., "/user/my-bookings" -> "My Bookings"
+      const pathPart = path.split("/").pop() || "";
+      label = pathPart
+        .replace(/-/g, " ")
+        .replace(/\b\w/g, (c) => c.toUpperCase())
+        .trim() || "Open Page";
+    }
+    return {
+      label,
+      action: path,
+      type: "NAVIGATION" as const,
+    };
+  });
+}
+
+// NEW: Helper function to determine actions based on FAQ target pages or user query
+function determineActions(question: string, sources: FaqEntry[] = []): ChatAction[] {
+  const targetActions = buildTargetPageActions(
+    sources.flatMap((faq) => faq.targetPages || [])
+  );
+  if (targetActions.length > 0) return targetActions;
+
   const lowerQ = question.toLowerCase();
   const actions: ChatAction[] = [];
 
@@ -433,31 +481,75 @@ function determineActions(question: string): ChatAction[] {
 
 export const ChatbotService = {
   async roameo(question: string) {
+    // Fetch all active FAQs (not limited to 5 for better matching)
     const faqs: FaqEntry[] = await prisma.faqEntry.findMany({
       where: { isActive: true },
       orderBy: [{ order: "asc" }, { createdAt: "desc" }],
-      take: 5,
     });
 
-    // Existing filter logic
+    const queryWords = question.toLowerCase().replace(/[?!.,]/g, '').split(' ').filter(w => w.length > 2);
+    
+    // Enhanced filter logic: check question, answer, tags, and pageKeywords
     const sources: FaqEntry[] = faqs.filter((faq: FaqEntry) => {
-      const queryWords = question.toLowerCase().replace(/[?]/g, '').split(' ').filter(w => w.length > 2);
-      const faqText = (faq.question + " " + faq.answer).toLowerCase();
+      // Combine all searchable text: question, answer, tags, pageKeywords
+      const faqQuestion = faq.question.toLowerCase();
+      const faqAnswer = faq.answer.toLowerCase();
+      const faqTags = (faq.tags || []).join(' ').toLowerCase();
+      const faqKeywords = (faq.pageKeywords || []).join(' ').toLowerCase();
+      const combinedText = `${faqQuestion} ${faqAnswer} ${faqTags} ${faqKeywords}`;
       
-      const matches = queryWords.filter(word => faqText.includes(word));
-      return matches.length >= 2; 
-    });
+      // Count how many query words match in the combined text
+      const matches = queryWords.filter(word => combinedText.includes(word));
+      
+      // Also check if any tag or keyword exactly matches a query word (stronger signal)
+      const exactTagMatch = (faq.tags || []).some(tag => 
+        queryWords.includes(tag.toLowerCase())
+      );
+      const exactKeywordMatch = (faq.pageKeywords || []).some(keyword => 
+        queryWords.includes(keyword.toLowerCase())
+      );
+      
+      // Match if 2+ words found OR an exact tag/keyword match
+      return matches.length >= 2 || exactTagMatch || exactKeywordMatch; 
+    }).slice(0, 5); // Limit to top 5 matches after filtering
 
     // NEW: Calculate actions before returning
-    const suggestedActions = determineActions(question);
+    const suggestedActions = determineActions(question, sources);
 
     if (sources.length === 0) {
-      return {
-        answer: "I'm not sure based on our official FAQs yet. Please contact support for help.",
-        confidence: "low" as const,
-        sources: [],
-        actions: suggestedActions, // Return actions even if no FAQ found
-      };
+      // No FAQ match found - use AI's own knowledge to provide a helpful response
+      const fallbackPrompt = `You are Roameo, the friendly and professional travel assistant for Bond Voyage, a Philippine travel agency.
+
+Guidelines:
+1. Use a warm, welcoming tone (e.g., "Certainly!", "Sure", "I'd be happy to help with that.").
+2. Refer to the company as "we" or "us" (e.g., "We can help you with...").
+3. Provide a helpful, informative answer based on your general knowledge about travel, tourism, and common travel agency services.
+4. If the question is about specific BondVoyage policies or internal systems you don't know about, politely suggest they contact our support team for detailed information and attempt to answer using your own knowledge.
+5. Keep responses concise but helpful (2-4 sentences).
+6. Focus on being genuinely useful rather than just saying you don't know. 
+7. Ensure the response is natural, within context (even if a keyword matches the question but the answer is not relevant to the question), and conversational.
+
+User question: ${question}
+
+Provide a helpful response:`;
+
+      try {
+        const fallbackAnswer = await callGemini(fallbackPrompt);
+        return {
+          answer: fallbackAnswer || "I don't have specific information about that in our FAQs, but I'd be happy to help! Please feel free to contact our support team for detailed assistance.",
+          confidence: "medium" as const,
+          sources: [],
+          actions: suggestedActions,
+        };
+      } catch (error) {
+        console.error("Fallback AI response failed:", error);
+        return {
+          answer: "I don't have specific information about that in our FAQs, but I'd be happy to help! Please feel free to contact our support team for detailed assistance.",
+          confidence: "low" as const,
+          sources: [],
+          actions: suggestedActions,
+        };
+      }
     }
 
     const context = (sources.length > 0 ? sources : faqs)
@@ -468,21 +560,23 @@ export const ChatbotService = {
       .join("\n\n");
 
       const prompt = `You are Roameo, the friendly and professional travel assistant for Bond Voyage. 
-      Your goal is to provide helpful, conversational support using ONLY the context provided below.
+      Your goal is to provide helpful, conversational support using the context provided below.
 
       Guidelines:
       1. Use a warm, welcoming tone (e.g., "Certainly!", "I'd be happy to help with that.").
       2. Refer to the company as "we" or "us" (e.g., "We can help you with...").
-      3. If the answer is found in the context, rephrase it naturally so it doesn't look like a copy-paste.
-      4. If the answer is NOT in the context, politely apologize and suggest they reach out to our human support team.
-      5. Keep the response helpful but professional.
+      3. Rephrase the answer naturally in your own words - do NOT copy-paste or quote directly.
+      4. DO NOT mention "FAQ", "context", "sources", or reference numbers in your response.
+      5. If the context helps answer the question, use it. If additional general knowledge helps, include it.
+      6. Keep the response helpful, natural, and conversational (2-4 sentences).
+      7. Never say things like "According to our FAQ..." or "Based on source #1...".
 
-      Context:
+      Context (for your reference only - don't mention these):
       ${context}
 
       User question: ${question}
 
-      Response:`;
+      Provide a natural, helpful response:`;
 
     const text = await callGemini(prompt);
 
@@ -496,6 +590,9 @@ export const ChatbotService = {
         id: faq.id,
         question: faq.question,
         order: faq.order,
+        targetPages: faq.targetPages,
+        tags: faq.tags,
+        pageKeywords: faq.pageKeywords,
       })),
       actions: suggestedActions, // Include the actions in the final response
     };

@@ -2,7 +2,8 @@
 
 ## What changed
 - Added structured notification payload validation and serialization.
-- Emitted notifications for booking creation/status changes, payment submission/status changes, and inquiry creation/replies.
+- **Notifications are ONLY for transaction processes between USER and ADMIN** (distinct from activity logs).
+- Emitted notifications for booking approval requests, payment verification requests/responses, booking status changes, and inquiry replies.
 - Added notification endpoints with pagination and mark-read/read-all actions.
 
 ## Endpoints
@@ -25,11 +26,15 @@
 ```
 
 ## Sample flows
-- **Booking created** → BOOKING notification to owner; admin copy for review.
-- **Booking status update** → BOOKING notification to owner (status + rejection reason embedded in message).
-- **Payment submitted** → PAYMENT notification to owner; admin copy for verification.
-- **Payment verified/rejected** → PAYMENT notification to owner.
-- **Inquiry created/replied** → INQUIRY notification to owner; admin notified on creation.
+**Principle: Notifications are ONLY for transactions between USER ↔ ADMIN, not user self-actions**
+
+- **Booking created by user** → No user notification (logged in activity); ADMIN notified for review.
+- **Booking submitted by user** → No user notification (they know they submitted); ADMIN notified for approval.
+- **Booking approved/rejected by admin** → USER notified (transaction complete); status + rejection reason embedded in message.
+- **Payment submitted by user** → No user notification (they know they paid); ADMIN notified for verification.
+- **Payment verified/rejected by admin** → USER notified (transaction complete).
+- **Inquiry created by user** → No user notification (they know they inquired); ADMIN notified.
+- **Inquiry replied by admin** → USER notified (admin response to inquiry).
 
 ## Validation rules
 - Payloads validated per type (booking/payment/inquiry/system/feedback) before insert; invalid payloads throw `INVALID_NOTIFICATION_PAYLOAD`.

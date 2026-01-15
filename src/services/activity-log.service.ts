@@ -5,54 +5,55 @@ type ActivityLogClient = Prisma.TransactionClient | PrismaClient;
 
 type AuditMetadata = Record<string, unknown> | undefined;
 
-// Standardized action types for activity logging
+// Descriptive action messages for activity logging
+// NOTE: These are human-readable, short descriptions - not error codes
 export const ActivityAction = {
   // Booking Management
-  BOOKING_CREATED: "BOOKING_CREATED",
-  BOOKING_UPDATED: "BOOKING_UPDATED",
-  BOOKING_CANCELLED: "BOOKING_CANCELLED",
-  BOOKING_COMPLETED: "BOOKING_COMPLETED",
-  BOOKING_VIEWED: "BOOKING_VIEWED",
+  BOOKING_CREATED: "Created booking",
+  BOOKING_UPDATED: "Updated booking",
+  BOOKING_CANCELLED: "Cancelled booking",
+  BOOKING_COMPLETED: "Completed booking",
+  BOOKING_VIEWED: "Viewed booking",
 
   // Approval & Workflow
-  BOOKING_APPROVED: "BOOKING_APPROVED",
-  BOOKING_REJECTED: "BOOKING_REJECTED",
+  BOOKING_APPROVED: "Approved booking",
+  BOOKING_REJECTED: "Rejected booking",
 
   // Itinerary Management
-  ITINERARY_CREATED: "ITINERARY_CREATED",
-  ITINERARY_UPDATED: "ITINERARY_UPDATED",
-  ITINERARY_DELETED: "ITINERARY_DELETED",
-  ITINERARY_DRAFT_SAVED: "ITINERARY_DRAFT_SAVED",
-  ITINERARY_SENT: "ITINERARY_SENT",
-  ITINERARY_CONFIRMED: "ITINERARY_CONFIRMED",
-  ITINERARY_REJECTED: "ITINERARY_REJECTED",
+  ITINERARY_CREATED: "Created itinerary",
+  ITINERARY_UPDATED: "Updated itinerary",
+  ITINERARY_DELETED: "Deleted itinerary",
+  ITINERARY_DRAFT_SAVED: "Saved itinerary draft",
+  ITINERARY_SENT: "Sent itinerary",
+  ITINERARY_CONFIRMED: "Confirmed itinerary",
+  ITINERARY_REJECTED: "Rejected itinerary",
 
   // User Management
-  USER_CREATED: "USER_CREATED",
-  USER_DELETED: "USER_DELETED",
-  USER_UPDATED: "USER_UPDATED",
-  USER_DEACTIVATED: "USER_DEACTIVATED",
-  USER_PROFILE_UPDATED: "USER_PROFILE_UPDATED",
+  USER_CREATED: "Created user account",
+  USER_DELETED: "Deleted user account",
+  USER_UPDATED: "Updated user account",
+  USER_DEACTIVATED: "Deactivated user account",
+  USER_PROFILE_UPDATED: "Updated profile",
 
   // Authentication & System
-  AUTH_LOGIN: "AUTH_LOGIN",
-  AUTH_LOGOUT: "AUTH_LOGOUT",
-  AUTH_PASSWORD_RESET: "AUTH_PASSWORD_RESET",
-  AUTH_PASSWORD_CHANGED: "AUTH_PASSWORD_CHANGED",
+  AUTH_LOGIN: "Logged in",
+  AUTH_LOGOUT: "Logged out",
+  AUTH_PASSWORD_RESET: "Reset password",
+  AUTH_PASSWORD_CHANGED: "Changed password",
 
   // Inquiry Management
-  INQUIRY_CREATED: "INQUIRY_CREATED",
-  INQUIRY_MESSAGE_SENT: "INQUIRY_MESSAGE_SENT",
-  INQUIRY_RESOLVED: "INQUIRY_RESOLVED",
+  INQUIRY_CREATED: "Created inquiry",
+  INQUIRY_MESSAGE_SENT: "Sent inquiry message",
+  INQUIRY_RESOLVED: "Resolved inquiry",
 
   // Payment
-  PAYMENT_RECEIVED: "PAYMENT_RECEIVED",
-  PAYMENT_VERIFIED: "PAYMENT_VERIFIED",
+  PAYMENT_RECEIVED: "Submitted payment",
+  PAYMENT_VERIFIED: "Verified payment",
 
   // FAQ Management
-  FAQ_CREATED: "FAQ_CREATED",
-  FAQ_UPDATED: "FAQ_UPDATED",
-  FAQ_DELETED: "FAQ_DELETED",
+  FAQ_CREATED: "Created FAQ",
+  FAQ_UPDATED: "Updated FAQ",
+  FAQ_DELETED: "Deleted FAQ",
 } as const;
 
 export type ActivityActionType = (typeof ActivityAction)[keyof typeof ActivityAction];

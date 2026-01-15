@@ -29,20 +29,9 @@ export const InquiryService = {
         },
       });
 
-      await NotificationService.create(
-        {
-          userId,
-          type: "INQUIRY",
-          title: "Inquiry created",
-          message: `Your inquiry "${subject}" has been received.`,
-          data: {
-            inquiryId: inquiry.id,
-            bookingId: inquiry.bookingId ?? undefined,
-            subject,
-          },
-        },
-        tx
-      );
+      // NOTE: Notifications only for transaction processes (USER <-> ADMIN)
+      // Notify admin only - this is the start of the transaction
+      // User doesn't need notification for their own inquiry creation
 
       await NotificationService.notifyAdmins({
         type: "INQUIRY",

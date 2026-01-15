@@ -38,6 +38,8 @@ class AuthController {
 
       const fullName = `${user.firstName} ${user.lastName}`;
 
+      // NOTE: System notification - user registration is an exception
+      // This is not a transaction but important system-level information for admins
       await NotificationService.notifyAdmins({
         type: "SYSTEM",
         title: "New User Registration",

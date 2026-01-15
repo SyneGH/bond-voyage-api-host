@@ -1204,23 +1204,35 @@ const allowedTransitions: Record<BookingStatus, BookingStatus[]> = {
 
 ## Notification Triggers
 
+**IMPORTANT: Notifications are ONLY for transaction processes between USER ↔ ADMIN**
+- Users do NOT get notified for their own actions (booking creation, payment submission, inquiry creation)
+- Activity logs track all events; notifications only for transactions requiring admin action or admin responses
+- This keeps notifications distinct from activity logs
+
 ### Booking Notifications
 
 | Event | User Notified | Admin Notified | Message Example |
 |-------|:-------------:|:--------------:|-----------------|
-| Booking created | ✅ | ✅ | "Your booking to Cebu has been created" |
-| Booking submitted | ✅ | ✅ | "Booking BV-2026-001 submitted for approval" |
-| Booking approved | ✅ | ❌ | "Your booking BV-2026-001 status is now CONFIRMED" |
-| Booking rejected | ✅ | ❌ | "Your booking BV-2026-001 was rejected" |
-| Booking cancelled | ✅ | ❌ | "Your booking BV-2026-001 status is now CANCELLED" |
+| Booking created | ❌ | ✅ | Admin: "Booking BV-2026-001 requires review" |
+| Booking submitted | ❌ | ✅ | Admin: "Booking BV-2026-001 submitted for approval" |
+| Booking approved | ✅ | ❌ | User: "Your booking BV-2026-001 status is now CONFIRMED" |
+| Booking rejected | ✅ | ❌ | User: "Your booking BV-2026-001 was rejected" |
+| Booking cancelled | ✅ | ❌ | User: "Your booking BV-2026-001 status is now CANCELLED" |
 
 ### Payment Notifications
 
 | Event | User Notified | Admin Notified | Message Example |
 |-------|:-------------:|:--------------:|-----------------|
-| Payment submitted | ✅ | ✅ | "Your payment for booking BV-2026-001 has been submitted" |
-| Payment verified | ✅ | ❌ | "Your payment for booking BV-2026-001 was verified" |
-| Payment rejected | ✅ | ❌ | "Your payment for booking BV-2026-001 was rejected" |
+| Payment submitted | ❌ | ✅ | Admin: "Payment requires verification for BV-2026-001" |
+| Payment verified | ✅ | ❌ | User: "Your payment for booking BV-2026-001 was verified" |
+| Payment rejected | ✅ | ❌ | User: "Your payment for booking BV-2026-001 was rejected" |
+
+### Inquiry Notifications
+
+| Event | User Notified | Admin Notified | Message Example |
+|-------|:-------------:|:--------------:|-----------------|
+| Inquiry created | ❌ | ✅ | Admin: "New inquiry requires attention" |
+| Admin reply | ✅ | ❌ | User: "You have a new reply to your inquiry" |
 
 ### Notification Data Structure
 
