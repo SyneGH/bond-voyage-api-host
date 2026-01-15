@@ -1867,4 +1867,51 @@ export const BookingService = {
 
     return versions;
   },
+
+  async joinByBookingCode(bookingCode: string, userId: string) {
+    return prisma.$transaction(async (tx) => {
+      const booking = await tx.booking.findUnique({
+        where: { bookingCode },
+        include: {
+          itinerary: {
+            include: {
+              collaborators: { select: { userId: true } },
+            },
+          },
+        },
+      });
+
+      if (!booking) {
+        throw new Error("BOOKING_NOT_FOUND");
+      }
+
+      const isOwner = booking.userId === userId;
+      const isCollaborator = booking.itinerary?.collaborators?.some(
+        (collab) => collab.userId === userId
+      );
+
+      if (isOwner || isCollaborator) {
+        return { collaborator: null, status: "ALREADY_COLLABORATOR" };
+      }
+
+      const collaborator = await tx.itineraryCollaborator.create({
+        data: {
+          itineraryId: booking.itineraryId,
+          userId,
+          invitedById: booking.userId,
+        },
+      });
+
+      await logAudit(tx, {
+        actorUserId: userId,
+        action: ActivityAction.BOOKING_UPDATED,
+        entityType: "BOOKING",
+        entityId: booking.id,
+        metadata: { action: "joined_via_booking_code", bookingCode },
+        message: "User joined booking via QR code",
+      });
+
+      return { collaborator, status: "ADDED" };
+    });
+  },
 };

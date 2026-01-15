@@ -794,4 +794,47 @@ export const BookingController = {
       );
     }
   },
+
+  // POST /api/bookings/join/:code (Join via Booking Code / QR code)
+  joinBooking: async (
+    req: AuthenticatedRequest,
+    res: Response
+  ): Promise<void> => {
+    try {
+      const { code } = req.params;
+      if (!code) {
+        throwError(HTTP_STATUS.BAD_REQUEST, "Booking code is required");
+      }
+      const authUser = requireAuthUser(req);
+
+      const result = await BookingService.joinByBookingCode(code, authUser.userId);
+
+      if (result.status === "ALREADY_COLLABORATOR") {
+        createResponse(res, HTTP_STATUS.OK, "Already a collaborator");
+        return;
+      }
+
+      createResponse(
+        res,
+        HTTP_STATUS.OK,
+        "Successfully joined travel",
+        result.collaborator
+      );
+    } catch (error: any) {
+      if (error instanceof ZodError) {
+        throwError(HTTP_STATUS.BAD_REQUEST, "Validation failed", error.errors);
+      }
+      if (error instanceof AppError) {
+        throw error;
+      }
+      if (error?.message === "BOOKING_NOT_FOUND") {
+        throwError(HTTP_STATUS.NOT_FOUND, "Booking not found");
+      }
+      throwError(
+        HTTP_STATUS.INTERNAL_SERVER_ERROR,
+        "Failed to join booking",
+        error
+      );
+    }
+  },
 };

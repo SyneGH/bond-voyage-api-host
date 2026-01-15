@@ -17,6 +17,9 @@ router.get("/shared-with-me", asyncHandler(BookingController.getSharedBookings))
 // USER: create
 router.post("/", bookingRateLimit, asyncHandler(BookingController.create));
 
+// USER: join via Booking Code (QR code)
+router.post("/join/:code", asyncHandler(BookingController.joinBooking));
+
 // USER: submit, cancel
 router.patch("/:id/submit", bookingRateLimit, asyncHandler(BookingController.submit));
 router.patch("/:id/confirm", asyncHandler(BookingController.confirm));
