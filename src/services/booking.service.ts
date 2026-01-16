@@ -1351,13 +1351,16 @@ export const BookingService = {
     };
   },
 
-  async deleteBookingDraft(bookingId: string, userId: string) {
-    const booking = await prisma.booking.findFirst({
-      where: { id: bookingId, userId },
-      select: { id: true, status: true },
+  async deleteBookingDraft(bookingId: string, userId: string, role: string) {
+    const booking = await prisma.booking.findUnique({
+      where: { id: bookingId },
+      select: { id: true, status: true, userId: true },
     });
 
     if (!booking) throw new Error("BOOKING_NOT_FOUND");
+
+    const isAdmin = role === Role.ADMIN;
+    if (!isAdmin && booking.userId !== userId) throw new Error("BOOKING_FORBIDDEN");
     if (booking.status !== "DRAFT") throw new Error("CANNOT_DELETE_NON_DRAFT");
 
     return prisma.booking.delete({ where: { id: bookingId } });

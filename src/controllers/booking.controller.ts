@@ -386,7 +386,7 @@ export const BookingController = {
     }
   },
 
-  // DELETE /api/bookings/:id (user can delete DRAFT only)
+  // DELETE /api/bookings/:id (user can delete own DRAFT; admin can delete any DRAFT)
   deleteDraft: async (
     req: AuthenticatedRequest,
     res: Response
@@ -395,7 +395,7 @@ export const BookingController = {
       const authUser = requireAuthUser(req);
 
       const { id } = bookingIdParamDto.parse(req.params);
-      await BookingService.deleteBookingDraft(id, authUser.userId);
+      await BookingService.deleteBookingDraft(id, authUser.userId, authUser.role);
       createResponse(res, HTTP_STATUS.OK, "Booking deleted");
     } catch (error: any) {
       if (error instanceof ZodError) {
@@ -406,6 +406,9 @@ export const BookingController = {
       }
       if (error?.message === "CANNOT_DELETE_NON_DRAFT") {
         throwError(HTTP_STATUS.CONFLICT, "Only drafts can be deleted");
+      }
+      if (error?.message === "BOOKING_FORBIDDEN") {
+        throwError(HTTP_STATUS.FORBIDDEN, "Forbidden");
       }
       if (error?.message === "BOOKING_NOT_FOUND") {
         throwError(HTTP_STATUS.NOT_FOUND, "Booking not found");
