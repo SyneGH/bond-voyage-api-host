@@ -81,6 +81,10 @@ interface RoamanPreferences {
   selectedDay?: number;
   currentDayActivities?: any[];
   totalDays?: number;
+
+  roamanMode?: "FULL_ITINERARY" | "ADD_TO_DAY";
+  targetDay?: number;
+  requestedActivitiesCount?: number;
 }
 
 interface RoamanActivityOutput {
@@ -125,6 +129,15 @@ function buildRoamanSystemPrompt(
   const endDate = preferences?.endDate || null;
   const userPrefs = preferences?.preferences || [];
 
+  const roamanMode = preferences?.roamanMode || "FULL_ITINERARY";
+  const targetDay = preferences?.targetDay || preferences?.selectedDay || 1;
+  const requestedActivitiesCount = Math.max(
+    1,
+    Math.min(20, preferences?.requestedActivitiesCount || 1)
+  );
+
+  const minActivitiesPerDay = 10;
+
   return `You are **Roaman**, the itinerary generator for the BondVoyage backend.
 
 ### Goal
@@ -141,8 +154,9 @@ Generate a **SMART_TRIP itinerary draft** compatible with the booking flow struc
    - \`dayNumber\` (integer, starting at 1 - NOT "day", use "dayNumber")
    - \`date\` (string YYYY-MM-DD or null)
    - \`title\` (string, catchy day title like "Island Hopping Adventure")
-   - \`activities\` (array with at least 4 items)
-6. **Each day MUST contain at least 4 activities**.
+  - \`activities\` (array)
+6. **Full itinerary mode:** Each day MUST contain at least ${minActivitiesPerDay} activities.
+7. **Add-to-day mode:** Draft MUST contain exactly 1 day (dayNumber = ${targetDay}) and its activities MUST contain exactly ${requestedActivitiesCount} NEW activities.
 7. Each activity MUST include ALL fields:
    - \`order\` (integer, sequential starting at 1, resets each day)
    - \`time\` (string \`HH:MM\` 24-hour)
@@ -156,6 +170,14 @@ Generate a **SMART_TRIP itinerary draft** compatible with the booking flow struc
 9. If startDate is null, set date: null for each day.
 10. Avoid placeholders like "Airport" or "Hotel" unless explicitly requested.
 11. Activities must be destination-relevant, varied, and time-ordered.
+
+### Mode
+- roamanMode: ${roamanMode}
+- If roamanMode is "ADD_TO_DAY":
+  - ONLY generate additions for Day ${targetDay}
+  - Do NOT regenerate other days
+  - Do NOT include existing activities in the JSON
+  - Return exactly ${requestedActivitiesCount} activities
 
 ### CRITICAL TRAVEL MODE RESTRICTIONS
 12. **LAND TRAVEL ONLY** - Do NOT include:
@@ -183,10 +205,10 @@ Be warm and enthusiastic. Use phrases like "I've curated a special route!", "Thi
 ### Pace Guidelines
 | Pace | Activities/Day |
 |------|----------------|
-| relaxed | 4 |
-| moderate | 4-5 |
-| packed | 5-7 |
-| own_pace | 4-5 |
+| relaxed | 10 |
+| moderate | 10-12 |
+| packed | 12-14 |
+| own_pace | 10-12 |
 
 ### Current Context
 - Destination: ${destination}
@@ -195,6 +217,18 @@ Be warm and enthusiastic. Use phrases like "I've curated a special route!", "Thi
 - Travelers: ${travelers}
 - Pace: ${pace}
 - Preferences: ${userPrefs.length > 0 ? userPrefs.join(", ") : "General sightseeing"}
+
+### Output Rules By Mode
+${roamanMode === "ADD_TO_DAY" ? `
+- Return draft.days as an array with EXACTLY ONE object.
+- That object MUST have dayNumber = ${targetDay}.
+- That object's activities array MUST contain EXACTLY ${requestedActivitiesCount} items.
+- These activities are NEW additions only (do not repeat existing items).
+- Keep the message concise and list only the new activities.
+` : `
+- Return a complete itinerary draft.
+- Each day MUST contain at least ${minActivitiesPerDay} activities (minimum).
+`}
 
 ### Example Output Structure
 {
@@ -231,15 +265,141 @@ function buildRoamanFallback(preferences?: RoamanPreferences): RoamanResponseDat
   const destination = preferences?.destination || "Cebu";
   const travelers = preferences?.travelers || 1;
   const startDate = preferences?.startDate || null;
+
+  const roamanMode = preferences?.roamanMode || "FULL_ITINERARY";
+  const targetDay = preferences?.targetDay || preferences?.selectedDay || 1;
+  const requestedActivitiesCount = Math.max(
+    1,
+    Math.min(20, preferences?.requestedActivitiesCount || 1)
+  );
   
-  const dayDate = startDate || null;
   const endDate = startDate || null;
 
   // Base coordinates for Cebu (default)
   const baseCoords = { lat: 10.3157, lng: 123.8854 };
 
+  const buildFallbackActivities = (count: number): RoamanActivityOutput[] => {
+    const times = [
+      "08:00",
+      "09:00",
+      "10:30",
+      "12:00",
+      "13:30",
+      "15:00",
+      "16:30",
+      "18:00",
+      "19:30",
+      "21:00",
+      "22:00",
+    ];
+    const templates = [
+      {
+        title: "Morning City Exploration",
+        locationName: `City Center, ${destination}, Philippines`,
+        description: "Start your day exploring the heart of the city and its local attractions.",
+        iconKey: "sightseeing",
+        offset: { lat: 0.001, lng: 0.001 },
+      },
+      {
+        title: "Coffee & Local Cafe Stop",
+        locationName: `Local Cafe, ${destination}, Philippines`,
+        description: "Recharge with a coffee break and sample local pastries.",
+        iconKey: "cafe",
+        offset: { lat: 0.0015, lng: -0.0008 },
+      },
+      {
+        title: "Cultural Heritage Visit",
+        locationName: `Heritage Site, ${destination}, Philippines`,
+        description: "Discover the rich cultural heritage and history of the area.",
+        iconKey: "culture",
+        offset: { lat: -0.001, lng: 0.002 },
+      },
+      {
+        title: "Local Cuisine Experience",
+        locationName: `Local Restaurant, ${destination}, Philippines`,
+        description: "Enjoy authentic local dishes and experience the regional flavors.",
+        iconKey: "food",
+        offset: { lat: 0.002, lng: -0.001 },
+      },
+      {
+        title: "Nature Walk / Viewpoint",
+        locationName: `Viewpoint Area, ${destination}, Philippines`,
+        description: "Take a relaxed walk and enjoy scenic views within the area.",
+        iconKey: "nature",
+        offset: { lat: 0.0006, lng: 0.0022 },
+      },
+      {
+        title: "Shopping & Souvenir Hunt",
+        locationName: `Public Market, ${destination}, Philippines`,
+        description: "Browse local products and pick up souvenirs.",
+        iconKey: "shopping",
+        offset: { lat: -0.0007, lng: 0.0012 },
+      },
+      {
+        title: "Relaxation Break",
+        locationName: `Park Area, ${destination}, Philippines`,
+        description: "Slow down and enjoy some downtime at a nearby park.",
+        iconKey: "relaxation",
+        offset: { lat: 0.0018, lng: 0.0017 },
+      },
+      {
+        title: "Sunset Spot",
+        locationName: `Waterfront Area, ${destination}, Philippines`,
+        description: "Catch the sunset and enjoy a golden-hour stroll.",
+        iconKey: "sightseeing",
+        offset: { lat: 0.003, lng: 0.003 },
+      },
+      {
+        title: "Dinner Recommendation",
+        locationName: `Dinner Spot, ${destination}, Philippines`,
+        description: "Wrap up with a satisfying dinner featuring regional favorites.",
+        iconKey: "food",
+        offset: { lat: 0.0026, lng: 0.0019 },
+      },
+      {
+        title: "Evening Leisure",
+        locationName: `Central Area, ${destination}, Philippines`,
+        description: "Enjoy a laid-back evening stroll and local ambiance.",
+        iconKey: "nightlife",
+        offset: { lat: 0.0029, lng: 0.0024 },
+      },
+    ];
+
+    return Array.from({ length: count }, (_, idx) => {
+      const template = templates[idx % templates.length];
+      const time = times[idx] || times[times.length - 1];
+      return {
+        order: idx + 1,
+        time,
+        title: template.title,
+        locationName: template.locationName,
+        coordinates: {
+          lat: baseCoords.lat + template.offset.lat + idx * 0.0001,
+          lng: baseCoords.lng + template.offset.lng + idx * 0.0001,
+        },
+        description: template.description,
+        iconKey: template.iconKey,
+      };
+    });
+  };
+
+  const minActivitiesPerDay = 10;
+  const activitiesCount =
+    roamanMode === "ADD_TO_DAY" ? requestedActivitiesCount : minActivitiesPerDay;
+
+  const dayNumber = roamanMode === "ADD_TO_DAY" ? targetDay : 1;
+  let dayDate: string | null = null;
+  if (startDate) {
+    const d = new Date(startDate);
+    d.setDate(d.getDate() + (dayNumber - 1));
+    dayDate = d.toISOString().split("T")[0];
+  }
+
   return {
-    message: "I've put together a starter draft for your BondVoyage adventure! Feel free to customize it to your liking.",
+    message:
+      roamanMode === "ADD_TO_DAY"
+        ? `Here are ${activitiesCount} new activity suggestion(s) for Day ${dayNumber} in ${destination}!`
+        : "I've put together a starter draft for your BondVoyage adventure! Feel free to customize it to your liking.",
     draft: {
       type: "SMART_TRIP",
       destination,
@@ -248,47 +408,10 @@ function buildRoamanFallback(preferences?: RoamanPreferences): RoamanResponseDat
       travelers,
       days: [
         {
-          dayNumber: 1,
+          dayNumber,
           date: dayDate,
           title: `${destination} Highlights`,
-          activities: [
-            {
-              order: 1,
-              time: "09:00",
-              title: "Morning City Exploration",
-              locationName: `City Center, ${destination}, Philippines`,
-              coordinates: { lat: baseCoords.lat + 0.001, lng: baseCoords.lng + 0.001 },
-              description: "Start your day exploring the heart of the city and its local attractions.",
-              iconKey: "sightseeing",
-            },
-            {
-              order: 2,
-              time: "12:00",
-              title: "Local Cuisine Experience",
-              locationName: `Local Restaurant, ${destination}, Philippines`,
-              coordinates: { lat: baseCoords.lat + 0.002, lng: baseCoords.lng - 0.001 },
-              description: "Enjoy authentic local dishes and experience the regional flavors.",
-              iconKey: "food",
-            },
-            {
-              order: 3,
-              time: "14:30",
-              title: "Cultural Heritage Visit",
-              locationName: `Heritage Site, ${destination}, Philippines`,
-              coordinates: { lat: baseCoords.lat - 0.001, lng: baseCoords.lng + 0.002 },
-              description: "Discover the rich cultural heritage and history of the area.",
-              iconKey: "culture",
-            },
-            {
-              order: 4,
-              time: "17:00",
-              title: "Sunset & Evening Leisure",
-              locationName: `Waterfront Area, ${destination}, Philippines`,
-              coordinates: { lat: baseCoords.lat + 0.003, lng: baseCoords.lng + 0.003 },
-              description: "Relax and enjoy the sunset views before dinner.",
-              iconKey: "relaxation",
-            },
-          ],
+          activities: buildFallbackActivities(activitiesCount),
         },
       ],
     },
@@ -306,6 +429,14 @@ function normalizeRoamanResponse(
   const startDate = preferences?.startDate || raw?.draft?.startDate || null;
   const endDate = preferences?.endDate || raw?.draft?.endDate || null;
 
+  const roamanMode = preferences?.roamanMode || "FULL_ITINERARY";
+  const targetDay = preferences?.targetDay || preferences?.selectedDay;
+  const requestedActivitiesCount = Math.max(
+    1,
+    Math.min(20, preferences?.requestedActivitiesCount || 1)
+  );
+  const minActivitiesPerDay = 10;
+
   // Default message if missing
   const message = raw?.message || "I've put together an itinerary for your adventure!";
 
@@ -319,7 +450,7 @@ function normalizeRoamanResponse(
     let date: string | null = null;
     if (startDate) {
       const d = new Date(startDate);
-      d.setDate(d.getDate() + dayIndex);
+      d.setDate(d.getDate() + (Number(dayNumber) - 1));
       date = d.toISOString().split("T")[0];
     } else {
       date = day.date || null;
@@ -329,7 +460,7 @@ function normalizeRoamanResponse(
     const title = day.title || `Day ${dayNumber}: ${destination} Adventure`;
 
     // Normalize activities
-    const activities: RoamanActivityOutput[] = (day.activities || []).map((act: any, actIndex: number) => {
+    let activities: RoamanActivityOutput[] = (day.activities || []).map((act: any, actIndex: number) => {
       // Fix malformed coordinates (Gemini sometimes outputs wrong keys)
       let lat = act.coordinates?.lat ?? act.lat ?? 10.3157;
       let lng = act.coordinates?.lng ?? act.lng ?? 123.8854;
@@ -358,6 +489,33 @@ function normalizeRoamanResponse(
       };
     });
 
+    // Enforce activity counts by mode
+    if (roamanMode === "ADD_TO_DAY") {
+      // Only keep the requested number of NEW activities
+      activities = activities.slice(0, requestedActivitiesCount);
+      // Re-sequence order
+      activities = activities.map((a, idx) => ({ ...a, order: idx + 1 }));
+    } else {
+      // Pad to minimum activities per day if needed
+      if (activities.length < minActivitiesPerDay) {
+        const missing = minActivitiesPerDay - activities.length;
+        const baseLat = activities[0]?.coordinates?.lat ?? 10.3157;
+        const baseLng = activities[0]?.coordinates?.lng ?? 123.8854;
+        for (let i = 0; i < missing; i++) {
+          const idx = activities.length + 1;
+          activities.push({
+            order: idx,
+            time: "20:00",
+            title: "Free Time / Explore Nearby",
+            locationName: `${destination}, Philippines`,
+            coordinates: { lat: baseLat + 0.0002 * idx, lng: baseLng + 0.0002 * idx },
+            description: "Use this slot for a flexible stop nearby based on your mood and energy.",
+            iconKey: "relaxation",
+          });
+        }
+      }
+    }
+
     return {
       dayNumber,
       date,
@@ -365,6 +523,14 @@ function normalizeRoamanResponse(
       activities,
     };
   });
+
+  // In ADD_TO_DAY mode, prefer returning exactly one day (targetDay) if provided.
+  const finalDays =
+    roamanMode === "ADD_TO_DAY" && targetDay
+      ? normalizedDays
+          .filter((d) => d.dayNumber === targetDay)
+          .slice(0, 1)
+      : normalizedDays;
 
   return {
     message,
@@ -374,7 +540,7 @@ function normalizeRoamanResponse(
       startDate,
       endDate,
       travelers,
-      days: normalizedDays,
+      days: finalDays,
     },
   };
 }

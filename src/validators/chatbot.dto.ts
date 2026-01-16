@@ -24,6 +24,11 @@ export const roamanPromptDto = z.object({
       selectedDay: z.number().int().positive().optional(),
       currentDayActivities: z.array(z.any()).optional(),
       totalDays: z.number().int().positive().optional(),
+
+      // Roaman operation mode (full itinerary vs single-day additions)
+      roamanMode: z.enum(["FULL_ITINERARY", "ADD_TO_DAY"]).optional(),
+      targetDay: z.number().int().positive().optional(),
+      requestedActivitiesCount: z.number().int().positive().max(20).optional(),
     })
     .optional(),
 });
