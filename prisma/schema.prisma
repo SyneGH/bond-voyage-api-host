@@ -331,6 +331,10 @@ model Booking {
   paymentStatus     PaymentStatus @default(PENDING) //
   paymentReceiptUrl String? // URL to uploaded GCash/Receipt image
 
+  // Collaboration Visibility
+  // When false, collaborators should not be able to view this booking (owner/admin transaction only).
+  visibleToCollaborators Boolean @default(true)
+
   requestedSourceBookingId String?
   requestedBookedAt DateTime?
 

@@ -97,6 +97,11 @@ export const BookingController = {
           (collab: { userId: string }) => collab.userId === authUser.userId
         );
 
+        // If collaboration has ended, collaborators must not be able to view.
+        if (isCollaborator && bookingRecord.visibleToCollaborators !== true) {
+          throwError(HTTP_STATUS.FORBIDDEN, "Forbidden");
+        }
+
         if (!isCollaborator) {
           throwError(HTTP_STATUS.FORBIDDEN, "Forbidden");
         }
@@ -670,6 +675,12 @@ export const BookingController = {
       if (error?.message === "CANNOT_ADD_OWNER") {
         throwError(HTTP_STATUS.CONFLICT, "Owner cannot be collaborator");
       }
+      if (error?.message === "BOOKING_COLLABORATION_ENDED") {
+        throwError(
+          HTTP_STATUS.CONFLICT,
+          "Collaboration has ended for this booking"
+        );
+      }
       throwError(
         HTTP_STATUS.INTERNAL_SERVER_ERROR,
         "Failed to add collaborator",
@@ -829,6 +840,12 @@ export const BookingController = {
       }
       if (error?.message === "BOOKING_NOT_FOUND") {
         throwError(HTTP_STATUS.NOT_FOUND, "Booking not found");
+      }
+      if (error?.message === "BOOKING_COLLABORATION_ENDED") {
+        throwError(
+          HTTP_STATUS.CONFLICT,
+          "Collaboration has ended for this booking"
+        );
       }
       throwError(
         HTTP_STATUS.INTERNAL_SERVER_ERROR,
