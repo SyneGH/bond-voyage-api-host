@@ -249,6 +249,23 @@ model ItineraryDay {
   @@map("itinerary_days")
 }
 
+// =========================================
+// SYSTEM SETTINGS
+// =========================================
+
+model PaymentSettings {
+  /// Singleton row. Use key = "default".
+  key            String  @id @db.VarChar(50)
+  accountName    String  @db.VarChar(100)
+  gcashMobile    String  @db.VarChar(30)
+  gcashQrCodeUrl String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("payment_settings")
+}
+
 model Activity {
   id             String       @id @default(uuid())
   itineraryDayId String

@@ -3,6 +3,7 @@ import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
 import cookieParser from "cookie-parser";
+import path from "path";
 import routes from "@/routes";
 import { HTTP_STATUS } from "@/constants/constants";
 import { createResponse } from "@/utils/responseHandler";
@@ -67,6 +68,9 @@ app.use(express.urlencoded({ extended: true, limit: bodyLimit }));
 
 // Cookie parsing middleware
 app.use(cookieParser());
+
+// Static uploads (multer diskStorage)
+app.use("/uploads", express.static(path.resolve(process.cwd(), "uploads")));
 
 // API routes
 app.use("/api/v1", routes);

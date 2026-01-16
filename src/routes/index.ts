@@ -18,6 +18,7 @@ import itineraryRoutes from "./itinerary.route";
 import faqRoutes from "./faq.route";
 import uploadRoutes from "./upload.route";
 import contactRoutes from "./contact.route";
+import paymentSettingsRoutes from "./payment-settings.route";
 
 const router = Router();
 
@@ -42,6 +43,7 @@ router.use("/itineraries", itineraryRoutes);
 router.use("/faqs", faqRoutes);
 router.use("/upload", uploadRoutes);
 router.use("/contact", contactRoutes);
+router.use("/payment-settings", paymentSettingsRoutes);
 
 // Health check route
 router.get("/health", (req, res) => {

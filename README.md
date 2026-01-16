@@ -288,11 +288,19 @@ All routes are prefixed with `/api/v1`. Unless noted as Public, endpoints requir
 | --- | --- | --- | --- |
 | GET | `/dashboard/stats` | Admin analytics snapshot. | Admin |
 
+### Payment Settings (`/payment-settings`)
+
+| Method | Endpoint | Description | Access |
+| --- | --- | --- | --- |
+| GET | `/payment-settings` | Fetch current payment settings (GCash number + QR URL). | Private |
+| PUT | `/payment-settings` | Update payment settings (accountName, gcashMobile, gcashQrCodeUrl). | Admin |
+
 ### Uploads (`/upload`)
 
 | Method | Endpoint | Description | Access |
 | --- | --- | --- | --- |
 | POST | `/upload/itinerary-thumbnail` | Upload itinerary thumbnail image. | Public |
+| POST | `/upload/gcash-qr` | Upload GCash QR image (multipart field: `file`) and persist as system payment QR. | Admin |
 
 ### Places & Weather Discovery (`/places`, `/weather`)
 
