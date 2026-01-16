@@ -70,11 +70,12 @@ class ContactController {
       const payload = travelAgencyContactDto.parse(req.body);
 
       // Process file attachments for Brevo (base64 encoding)
-      let attachments: Array<{ filename: string; content: string }> | undefined;
+      // Brevo API requires 'name' field, not 'filename'
+      let attachments: Array<{ name: string; content: string }> | undefined;
 
       if (files && files.length > 0) {
         attachments = files.map((file) => ({
-          filename: file.originalname,
+          name: file.originalname,
           content: fileToBase64(file.path),
         }));
       }

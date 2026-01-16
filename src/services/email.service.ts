@@ -285,7 +285,7 @@ This link will expire in 15 minutes.
     message: string,
     senderName: string,
     senderEmail: string,
-    attachments?: Array<{ filename: string; content: string }>
+    attachments?: Array<{ name: string; content: string }>
   ): Promise<void> {
     try {
       const apiKey = process.env.BREVO_API_KEY;
@@ -441,7 +441,7 @@ This link will expire in 15 minutes.
     message: string,
     senderName: string,
     senderEmail: string,
-    attachments?: Array<{ filename: string; content: string }>
+    attachments?: Array<{ name: string; content: string }>
   ): string {
     return `
   <!DOCTYPE html>
@@ -510,7 +510,7 @@ This link will expire in 15 minutes.
               <div style="background: white; padding: 12px; border-radius: 8px; margin-bottom: 8px; display: flex; align-items: center; gap: 12px;">
                 <div style="width: 40px; height: 40px; background: #fbbf24; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 18px;">📄</div>
                 <div style="flex: 1;">
-                  <p style="margin: 0 0 2px 0; color: #1e293b; font-size: 14px; font-weight: 600;">${file.filename}</p>
+                  <p style="margin: 0 0 2px 0; color: #1e293b; font-size: 14px; font-weight: 600;">${file.name}</p>
                 </div>
               </div>
             `

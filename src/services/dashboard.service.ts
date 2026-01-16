@@ -56,7 +56,8 @@ export const DashboardService = {
   async getStats(year: number, userId: string) {
     const [totalUsers, pendingApprovals, activeBookings, completedTrips] =
       await prisma.$transaction([
-        prisma.user.count(),
+        // Exclude ADMIN roles from total user count - only count regular users
+        prisma.user.count({ where: { role: "USER" } }),
         prisma.booking.count({ where: { status: "PENDING" } }),
         prisma.booking.count({ where: { status: "CONFIRMED" } }),
         prisma.booking.count({ where: { status: "COMPLETED" } }),
