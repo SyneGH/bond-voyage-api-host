@@ -347,7 +347,7 @@ const normalizeItineraryPayload = (
 
 export const BookingService = {
   async createBooking(data: CreateBookingDTO) {
-    return prisma.$transaction(async (tx) => {
+    const booking = await prisma.$transaction(async (tx) => {
       const bookingInclude = {
         itinerary: {
           include: {
@@ -493,22 +493,6 @@ export const BookingService = {
           message: "Booking created",
         });
 
-        // NOTE: Notifications only for transaction processes (USER <-> ADMIN)
-        // Booking creation is logged in activity logs, not notified
-
-        await NotificationService.notifyAdmins({
-          type: "BOOKING",
-          title: "New booking created",
-          message: `Booking ${booking.bookingCode} requires review`,
-          data: {
-            bookingId: booking.id,
-            bookingCode: booking.bookingCode,
-            status: booking.status,
-            itineraryId: booking.itineraryId,
-            destination: booking.destination ?? undefined,
-          },
-        });
-
         return booking;
       }
 
@@ -617,28 +601,24 @@ export const BookingService = {
             type: isRequested ? "REQUESTED" : "STANDARD",
           },
           message: "Booking created",
-        });        
-
-        // NOTE: Notifications only for transaction processes (USER <-> ADMIN)
-        // Booking creation is logged in activity logs, not notified
-
-        await NotificationService.notifyAdmins({
-          type: "BOOKING",
-          title: "New booking created",
-          message: `Booking ${booking.bookingCode} requires review`,
-          data: {
-            bookingId: booking.id,
-            bookingCode: booking.bookingCode,
-            status: booking.status,
-            itineraryId: booking.itineraryId,
-            destination: booking.destination ?? undefined,
-          },
         });
 
         return booking;
       }
 
       const shouldCreateItinerary = !data.itineraryId && data.itinerary;
+
+      // Resolve dates: prefer top-level dates, fallback to inline itinerary dates
+      const resolvedStartDate = data.startDate
+        ? new Date(data.startDate)
+        : data.itinerary?.startDate
+          ? new Date(data.itinerary.startDate)
+          : undefined;
+      const resolvedEndDate = data.endDate
+        ? new Date(data.endDate)
+        : data.itinerary?.endDate
+          ? new Date(data.itinerary.endDate)
+          : undefined;
 
       const itinerary = shouldCreateItinerary
         ? await tx.itinerary.create({
@@ -648,8 +628,8 @@ export const BookingService = {
               title: data.itinerary?.title ?? "Itinerary",
               destination: data.itinerary?.destination ?? "",
 
-              startDate: data.itinerary?.startDate ? new Date(data.itinerary.startDate) : undefined,
-              endDate: data.itinerary?.endDate ? new Date(data.itinerary.endDate) : undefined,
+              startDate: resolvedStartDate,
+              endDate: resolvedEndDate,
 
               travelers: data.itinerary?.travelers ?? 1,
               type: isRequested
@@ -721,15 +701,15 @@ export const BookingService = {
 
       const bookingCode = await generateBookingCode(tx);
 
-      // ✅ CORRECT FIX: Use undefined fallback to match Prisma's optional fields
+      // ✅ CORRECT FIX: Use resolved dates with fallback to itinerary dates
       const booking = await tx.booking.create({
         data: {
           bookingCode,
           userId: resolvedTargetUserId,
           itineraryId: itinerary.id,
           destination: itinerary.destination,
-          startDate: itinerary.startDate ?? undefined,  // ✅ undefined for optional Date
-          endDate: itinerary.endDate ?? undefined,      // ✅ undefined for optional Date
+          startDate: itinerary.startDate ?? resolvedStartDate ?? undefined,
+          endDate: itinerary.endDate ?? resolvedEndDate ?? undefined,
           travelers: itinerary.travelers,
 
           totalPrice: data.totalPrice as unknown as Prisma.Decimal,
@@ -770,24 +750,29 @@ export const BookingService = {
         message: "Booking created",
       });
 
-      // NOTE: Notifications only for transaction processes (USER <-> ADMIN)
-      // Booking creation is logged in activity logs, not notified
-
-      await NotificationService.notifyAdmins({
-        type: "BOOKING",
-        title: "New booking created",
-        message: `Booking ${booking.bookingCode} requires review`,
-        data: {
-          bookingId: booking.id,
-          bookingCode: booking.bookingCode,
-          status: booking.status,
-          itineraryId: booking.itineraryId,
-          destination: booking.destination ?? undefined,
-        },
-      });
-
       return booking;
+    }, {
+      timeout: 15000, // Increase timeout for complex booking operations
     });
+
+    // Send notification outside the transaction to prevent timeout
+    // Notification failure should not roll back the booking
+    NotificationService.notifyAdmins({
+      type: "BOOKING",
+      title: "New booking created",
+      message: `Booking ${booking.bookingCode} requires review`,
+      data: {
+        bookingId: booking.id,
+        bookingCode: booking.bookingCode,
+        status: booking.status,
+        itineraryId: booking.itineraryId,
+        destination: booking.destination ?? undefined,
+      },
+    }).catch((err) => {
+      console.error("Failed to notify admins about new booking:", err);
+    });
+
+    return booking;
   },
 
   async getBookingById(id: string) {
