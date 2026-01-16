@@ -382,6 +382,22 @@ export const BookingService = {
       const resolvedCustomerEmail = targetUser?.email ?? data.customerEmail;
       const resolvedCustomerMobile = targetUser?.mobile ?? data.customerMobile;
 
+      // Backward compatibility: some clients send the tour package id in `itineraryId`
+      // for STANDARD bookings. If `itineraryId` doesn't exist as an Itinerary, treat it
+      // as `tourPackageId`.
+      let tourPackageId = data.tourPackageId;
+      let itineraryId = data.itineraryId;
+      if (!tourPackageId && data.type === BookingType.STANDARD && itineraryId) {
+        const maybeItinerary = await tx.itinerary.findUnique({
+          where: { id: itineraryId },
+          select: { id: true },
+        });
+        if (!maybeItinerary) {
+          tourPackageId = itineraryId;
+          itineraryId = undefined;
+        }
+      }
+
       const isSmartTrip =
         data.itineraryType === ItineraryType.SMART_TRIP || data.itineraryData;
 
@@ -496,9 +512,9 @@ export const BookingService = {
         return booking;
       }
 
-      if (data.tourPackageId) {
+      if (tourPackageId) {
         const tourPackage = await tx.tourPackage.findUnique({
-          where: { id: data.tourPackageId },
+          where: { id: tourPackageId },
           include: {
             days: {
               orderBy: { dayNumber: "asc" },
@@ -597,7 +613,7 @@ export const BookingService = {
             bookingCode: booking.bookingCode,
             destination: booking.destination,
             status: booking.status,
-            tourPackageId: data.tourPackageId,
+            tourPackageId,
             type: isRequested ? "REQUESTED" : "STANDARD",
           },
           message: "Booking created",
@@ -606,7 +622,7 @@ export const BookingService = {
         return booking;
       }
 
-      const shouldCreateItinerary = !data.itineraryId && data.itinerary;
+      const shouldCreateItinerary = !itineraryId && data.itinerary;
 
       // Resolve dates: prefer top-level dates, fallback to inline itinerary dates
       const resolvedStartDate = data.startDate
@@ -662,7 +678,7 @@ export const BookingService = {
             },
           })
         : await tx.itinerary.findUnique({
-            where: { id: data.itineraryId },
+            where: { id: itineraryId },
             include: {
               collaborators: true,
               days: { include: { activities: true }, orderBy: { dayNumber: "asc" } },
@@ -692,7 +708,7 @@ export const BookingService = {
       }
 
       if (
-        data.itineraryId &&
+        itineraryId &&
         itinerary.type === ItineraryType.REQUESTED &&
         itinerary.requestedStatus !== "CONFIRMED"
       ) {
@@ -827,9 +843,9 @@ export const BookingService = {
 
       const isAdmin = actorRole === Role.ADMIN;
       const isOwner = booking.userId === userId;
-      const isCollaborator = booking.itinerary.collaborators.some(
-        (collab) => collab.userId === userId
-      );
+      const isCollaborator =
+        booking.visibleToCollaborators === true &&
+        booking.itinerary.collaborators.some((collab) => collab.userId === userId);
 
       if (!isAdmin && !isOwner && !isCollaborator) {
         throw new Error("BOOKING_FORBIDDEN");
@@ -1200,6 +1216,7 @@ export const BookingService = {
     const skip = (page - 1) * limit;
     const whereClause: Prisma.BookingWhereInput = {
       userId: { not: userId },
+      visibleToCollaborators: true,
       itinerary: { collaborators: { some: { userId } } },
     };
 
@@ -1362,12 +1379,15 @@ export const BookingService = {
           id: true,
           status: true,
           bookingCode: true,
+          destination: true,
           type: true,
           itinerary: {
             select: {
               id: true,
               userId: true,
+              destination: true,
               requestedStatus: true,
+              collaborators: { select: { userId: true } },
               days: {
                 select: {
                   activities: { select: { id: true } },
@@ -1435,8 +1455,58 @@ export const BookingService = {
           rejectionReason: null,
           rejectionResolution: null,
           isResolved: false,
+          visibleToCollaborators: false,
         },
       });
+
+      // End collaboration on submission: hide booking and itinerary from collaborators.
+      // - Collaborators lose visibility immediately
+      // - Existing share tokens are revoked
+      // - Collaborator rows are deleted
+      const itineraryId = booking.itinerary?.id;
+      if (itineraryId) {
+        const collaboratorIds = (booking.itinerary?.collaborators ?? [])
+          .map((c) => c.userId)
+          .filter((id) => id !== userId);
+
+        if (collaboratorIds.length > 0) {
+          const destinationForMessage =
+            booking.destination ?? booking.itinerary?.destination ?? "your trip";
+
+          await Promise.all(
+            collaboratorIds.map((collaboratorUserId) =>
+              NotificationService.create(
+                {
+                  userId: collaboratorUserId,
+                  type: "BOOKING",
+                  title: "Collaboration ended",
+                  message: `The booking for ${destinationForMessage} has been submitted for approval. Your collaboration access has ended.`,
+                  data: {
+                    bookingId: booking.id,
+                    bookingCode: booking.bookingCode ?? undefined,
+                    status: "PENDING",
+                    itineraryId,
+                    destination: destinationForMessage,
+                  },
+                },
+                tx
+              )
+            )
+          );
+        }
+
+        await tx.itineraryShare.updateMany({
+          where: { itineraryId, revokedAt: null },
+          data: { revokedAt: new Date() },
+        });
+
+        await tx.itineraryCollaborator.deleteMany({
+          where: {
+            itineraryId,
+            NOT: { userId },
+          },
+        });
+      }
 
       await logAudit(tx, {
         actorUserId: userId,
@@ -1469,16 +1539,37 @@ export const BookingService = {
           status: true,
           type: true,
           itineraryId: true,
+          userId: true,
           itinerary: { select: { userId: true, requestedStatus: true } },
         },
       });
 
       if (!booking) throw new Error("BOOKING_NOT_FOUND");
+
+      // Only the booking owner can cancel.
+      if (booking.userId !== userId) {
+        throw new Error("BOOKING_FORBIDDEN");
+      }
+
       if (booking.type === BookingType.REQUESTED) {
-        if (booking.itinerary?.userId !== userId) {
-          throw new Error("BOOKING_FORBIDDEN");
-        }
         if (booking.itinerary?.requestedStatus === "CANCELLED") {
+          // Ensure collaboration is ended even if the request was already cancelled.
+          await tx.booking.update({
+            where: { id: bookingId },
+            data: { visibleToCollaborators: false },
+          });
+
+          await tx.itineraryShare.updateMany({
+            where: { itineraryId: booking.itineraryId, revokedAt: null },
+            data: { revokedAt: new Date() },
+          });
+          await tx.itineraryCollaborator.deleteMany({
+            where: {
+              itineraryId: booking.itineraryId,
+              NOT: { userId: booking.userId },
+            },
+          });
+
           return booking;
         }
         if (booking.itinerary?.requestedStatus !== "SENT") {
@@ -1487,7 +1578,7 @@ export const BookingService = {
 
         const updated = await tx.booking.update({
           where: { id: bookingId },
-          data: { status: "CANCELLED", isResolved: true },
+          data: { status: "CANCELLED", isResolved: true, visibleToCollaborators: false },
         });
 
         await tx.itinerary.update({
@@ -1506,6 +1597,18 @@ export const BookingService = {
           message: "Booking cancelled",
         });
 
+        // End collaboration on cancel: hide itinerary from collaborators and revoke share tokens.
+        await tx.itineraryShare.updateMany({
+          where: { itineraryId: booking.itineraryId, revokedAt: null },
+          data: { revokedAt: new Date() },
+        });
+        await tx.itineraryCollaborator.deleteMany({
+          where: {
+            itineraryId: booking.itineraryId,
+            NOT: { userId: booking.userId },
+          },
+        });
+
         return updated;
       }
 
@@ -1516,7 +1619,7 @@ export const BookingService = {
 
       const updated = await tx.booking.update({
         where: { id: bookingId },
-        data: { status: "CANCELLED", isResolved: true },
+        data: { status: "CANCELLED", isResolved: true, visibleToCollaborators: false },
       });
 
       await logAudit(tx, {
@@ -1526,6 +1629,18 @@ export const BookingService = {
         entityId: bookingId,
         metadata: { status: updated.status },
         message: "Booking cancelled",
+      });
+
+      // End collaboration on cancel: hide itinerary from collaborators and revoke share tokens.
+      await tx.itineraryShare.updateMany({
+        where: { itineraryId: booking.itineraryId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+      await tx.itineraryCollaborator.deleteMany({
+        where: {
+          itineraryId: booking.itineraryId,
+          NOT: { userId: booking.userId },
+        },
       });
 
       return updated;
@@ -1707,10 +1822,15 @@ export const BookingService = {
     return prisma.$transaction(async (tx) => {
       const booking = await tx.booking.findFirst({
         where: { id: bookingId, userId: ownerId },
-        select: { id: true, itineraryId: true, userId: true },
+        select: { id: true, itineraryId: true, userId: true, status: true, visibleToCollaborators: true },
       });
 
       if (!booking) throw new Error("BOOKING_NOT_FOUND");
+
+      // Collaborations are only allowed while the booking is in DRAFT.
+      if (booking.status !== "DRAFT" || booking.visibleToCollaborators !== true) {
+        throw new Error("BOOKING_COLLABORATION_ENDED");
+      }
 
       if (booking.userId === collaboratorId) {
         throw new Error("CANNOT_ADD_OWNER");
@@ -1770,9 +1890,9 @@ export const BookingService = {
     if (!booking) throw new Error("BOOKING_NOT_FOUND");
 
     const isOwner = booking.userId === userId;
-    const isCollaborator = booking.itinerary.collaborators.some(
-      (collab) => collab.userId === userId
-    );
+    const isCollaborator =
+      booking.visibleToCollaborators === true &&
+      booking.itinerary.collaborators.some((collab) => collab.userId === userId);
 
     if (!isOwner && !isCollaborator) {
       throw new Error("BOOKING_FORBIDDEN");
@@ -1832,9 +1952,9 @@ export const BookingService = {
 
     const isOwner = booking.userId === userId;
     const isAdmin = userRole === "ADMIN";
-    const isCollaborator = booking.itinerary?.collaborators?.some(
-      (c) => c.userId === userId
-    );
+    const isCollaborator =
+      booking.visibleToCollaborators === true &&
+      booking.itinerary?.collaborators?.some((c) => c.userId === userId);
 
     if (!isOwner && !isAdmin && !isCollaborator) {
       throw new Error("BOOKING_FORBIDDEN");
@@ -1870,6 +1990,11 @@ export const BookingService = {
 
       if (!booking) {
         throw new Error("BOOKING_NOT_FOUND");
+      }
+
+      // Joining is only allowed while collaboration is active (DRAFT).
+      if (booking.status !== "DRAFT" || booking.visibleToCollaborators !== true) {
+        throw new Error("BOOKING_COLLABORATION_ENDED");
       }
 
       const isOwner = booking.userId === userId;
