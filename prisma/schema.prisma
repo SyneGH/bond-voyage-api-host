@@ -7,7 +7,7 @@ generator client {
 datasource db {
   provider  = "postgresql"
   url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
+  //directUrl = env("DIRECT_URL")
 }
 
 // =========================================
@@ -101,6 +101,13 @@ enum NotificationType {
   SYSTEM
 }
 
+enum ChatMessageKind {
+  USER
+  ADMIN
+  AI_SUGGESTION
+  SYSTEM
+}
+
 // =========================================
 // CORE MODELS
 // =========================================
@@ -142,6 +149,7 @@ model User {
   paymentSubmissions    Payment[]               @relation("payment_submissions")
   createdItineraryVersions ItineraryVersion[]   @relation("itinerary_versions_created")
   sharesCreated         ItineraryShare[]        @relation("share_creator")
+  bookingChatMessages   BookingChatMessage[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -357,11 +365,33 @@ model Booking {
 
   payments  Payment[]
   inquiries Inquiry[]
+  chatMessages BookingChatMessage[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@map("bookings")
+}
+
+model BookingChatMessage {
+  id           String          @id @default(uuid())
+  bookingId    String
+  booking      Booking         @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  senderUserId String?
+  sender       User?           @relation(fields: [senderUserId], references: [id], onDelete: SetNull)
+
+  kind         ChatMessageKind @default(USER)
+  content      String          @db.Text
+  attachments  Json            @default("[]")
+  isRead       Boolean         @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([bookingId, createdAt(sort: Desc)])
+  @@index([senderUserId])
+  @@map("booking_chat_messages")
 }
 
 model BookingSequence {

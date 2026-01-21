@@ -255,6 +255,69 @@ Output must follow the provided JSON schema exactly.
     }
   },
 
+  async generateRefinementSuggestion(context: {
+    booking: Record<string, unknown>;
+    itinerary: Record<string, unknown> | null;
+    chatHistory: string[];
+    perspective: string;
+  }): Promise<string> {
+    const apiKey = process.env.GEMINI_API_KEY;
+
+    if (!apiKey) {
+      throw new Error("GEMINI_API_KEY missing");
+    }
+
+    const client = new GoogleGenAI({ apiKey });
+    const isAgent = context.perspective === "travel_agent";
+
+    const systemPrompt = isAgent
+      ? `You are an AI assistant for Bond Voyage travel agents.
+Provide concise, professional refinement suggestions to improve itineraries.
+
+Guidelines:
+- Focus on logistics, pricing alignment, and guest experience
+- Highlight potential issues or improvements
+- Keep 4-5 bullet points
+- Use markdown headings and bullets`
+      : `You are a friendly AI travel assistant for Bond Voyage customers.
+Provide helpful, easy-to-understand refinement suggestions.
+
+Guidelines:
+- Focus on experience, pacing, and value
+- Keep 3-4 bullet points
+- Encourage discussion with the travel agent
+- Use markdown headings and bullets`;
+
+    const userPrompt = `Here is the current booking and itinerary context:
+
+## Booking Details
+${JSON.stringify(context.booking, null, 2)}
+
+## Current Itinerary
+${context.itinerary ? JSON.stringify(context.itinerary, null, 2) : "No itinerary created yet."}
+
+## Recent Chat Discussion
+${context.chatHistory.length > 0 ? context.chatHistory.join("\n") : "No previous discussion."}
+
+Provide refinement suggestions based on this context.`;
+
+    const response = await client.models.generateContent({
+      model: process.env.GEMINI_MODEL || "gemini-2.5-flash-lite-preview-06-2025",
+      contents: [{ role: "user", parts: [{ text: userPrompt }] }],
+      config: {
+        systemInstruction: systemPrompt,
+        temperature: 0.7,
+        maxOutputTokens: 1024,
+      },
+    });
+
+    if (!response.text) {
+      throw new Error("Empty AI response");
+    }
+
+    return response.text;
+  },
+
   // === FALLBACK LOGIC ===
 
   buildFallbackItinerary(input: ItineraryInput, duration: number): DayOutput[] {

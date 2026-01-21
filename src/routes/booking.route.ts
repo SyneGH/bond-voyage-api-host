@@ -1,10 +1,12 @@
 import { Router } from "express";
 import { BookingController } from "@/controllers/booking.controller";
+import { BookingChatController } from "@/controllers/booking-chat.controller";
 import { PaymentController } from "@/controllers/payment.controller";
 import { authenticate, authorize } from "@/middlewares/auth.middleware";
 import { Role } from "@/constants/constants";
 import { bookingRateLimit } from "@/middlewares/rate-limit.middleware";
 import { asyncHandler } from "@/middlewares/async.middleware";
+import { upload } from "@/middlewares/upload.middleware";
 
 const router = Router();
 
@@ -37,6 +39,17 @@ router.delete("/:id", asyncHandler(BookingController.deleteDraft));
 
 // USER/ADMIN: detail
 router.get("/:id", asyncHandler(BookingController.getOne));
+
+// BOOKING CHAT
+router.get("/:id/chat/messages", asyncHandler(BookingChatController.getMessages));
+router.post(
+  "/:id/chat/messages",
+  upload.array("files", parseInt(process.env.MAX_FILES || "5", 10)),
+  asyncHandler(BookingChatController.sendMessage)
+);
+router.post("/:id/chat/ai-suggest", asyncHandler(BookingChatController.generateAiSuggestion));
+router.post("/:id/chat/mark-read", asyncHandler(BookingChatController.markAsRead));
+router.get("/:id/chat/unread-count", asyncHandler(BookingChatController.getUnreadCount));
 
 // USER: version history
 router.get("/:id/versions", asyncHandler(BookingController.getVersionHistory));
