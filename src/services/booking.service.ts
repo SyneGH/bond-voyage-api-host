@@ -1071,9 +1071,7 @@ export const BookingService = {
           status,
           rejectionReason: status === "REJECTED" ? reason : null,
           rejectionResolution: status === "REJECTED" ? resolution : null,
-          isResolved: ["CONFIRMED", "REJECTED", "CANCELLED", "COMPLETED"].includes(
-            status
-          ),
+          isResolved: ["CONFIRMED", "CANCELLED", "COMPLETED"].includes(status),
         },
       });
 
@@ -1092,7 +1090,7 @@ export const BookingService = {
           status === "CONFIRMED"
             ? "Booking approved"
             : status === "REJECTED"
-              ? "Booking rejected"
+              ? "Refinement requested"
               : status === "COMPLETED"
                 ? "Booking completed"
                 : status === "CANCELLED"
@@ -1115,7 +1113,7 @@ export const BookingService = {
           title: "Booking status updated",
           message:
             status === "REJECTED"
-              ? `Your booking ${booking.bookingCode} was rejected.`
+              ? `Refinement requested for booking ${booking.bookingCode}.`
               : `Your booking ${booking.bookingCode} status is now ${status}.`,
           data: {
             bookingId: bookingId,

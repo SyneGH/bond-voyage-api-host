@@ -95,6 +95,25 @@ const itinerarySchema = {
         required: ["day", "title", "activities"],
       },
     },
+    suggestedBudget: {
+      type: "OBJECT",
+      properties: {
+        total: { type: "NUMBER" },
+        breakdown: {
+          type: "OBJECT",
+          properties: {
+            transport: { type: "NUMBER" },
+            meals: { type: "NUMBER" },
+            activities: { type: "NUMBER" },
+            accommodation: { type: "NUMBER" },
+            misc: { type: "NUMBER" },
+          },
+          required: ["transport", "meals", "activities", "accommodation", "misc"],
+        },
+        note: { type: "STRING" },
+      },
+      required: ["total", "breakdown"],
+    },
   },
   required: ["days"],
 };
@@ -217,6 +236,8 @@ ${budget ? `- Budget: ₱${budget.toLocaleString()}` : ""}
    - Ordered logically by time (morning to evening)
    - Appropriate for the travel pace
 
+6. Provide a top-level JSON field "suggestedBudget" with a realistic total and breakdown (transport, meals, activities, accommodation, misc). Compute totals using travelers × days × typical daily costs; if a user budget is provided, compare and suggest a realistic amount when needed.
+
 **Day Titles:** Short and catchy (e.g., "Island Hopping Adventure", "Cultural Heritage Walk")
 
 Output must follow the provided JSON schema exactly.
@@ -282,6 +303,72 @@ Output must follow the provided JSON schema exactly.
         ),
       };
     }
+  },
+
+  async generateRefinementSuggestion(context: {
+    booking: Record<string, unknown>;
+    itinerary: Record<string, unknown> | null;
+    chatHistory: string[];
+    perspective: string;
+  }): Promise<string> {
+    const apiKey = process.env.GEMINI_API_KEY;
+
+    if (!apiKey) {
+      throw new Error("GEMINI_API_KEY missing");
+    }
+
+    const client = new GoogleGenAI({ apiKey });
+    const isAgent = context.perspective === "travel_agent";
+
+    const systemPrompt = isAgent
+      ? `You are an AI assistant for Bond Voyage travel agents.
+Provide concise, professional refinement suggestions to improve itineraries.
+
+Guidelines:
+- Focus on logistics, pricing alignment, and guest experience
+- Highlight potential issues or improvements
+    - Include an approximate budget summary when budget data is available (transport, meals, activities, accommodation, misc)
+- Keep 4-5 bullet points
+- Use markdown headings and bullets`
+      : `You are a friendly AI travel assistant for Bond Voyage customers.
+Provide helpful, easy-to-understand refinement suggestions.
+
+Guidelines:
+- Focus on experience, pacing, and value
+    - Include an approximate budget summary when budget data is available (transport, meals, activities, accommodation, misc)
+- Keep 3-4 bullet points
+- Encourage discussion with the travel agent
+- Use markdown headings and bullets`;
+
+    const userPrompt = `Here is the current booking and itinerary context:
+
+## Booking Details
+${JSON.stringify(context.booking, null, 2)}
+
+## Current Itinerary
+${context.itinerary ? JSON.stringify(context.itinerary, null, 2) : "No itinerary created yet."}
+
+## Recent Chat Discussion
+${context.chatHistory.length > 0 ? context.chatHistory.join("\n") : "No previous discussion."}
+
+Provide refinement suggestions based on this context.
+If budget information is present, add a short approximate budget breakdown (transport, meals, activities, accommodation, misc).`;
+
+    const response = await client.models.generateContent({
+      model: process.env.GEMINI_MODEL || "gemini-2.5-flash-lite-preview-06-2025",
+      contents: [{ role: "user", parts: [{ text: userPrompt }] }],
+      config: {
+        systemInstruction: systemPrompt,
+        temperature: 0.7,
+        maxOutputTokens: 1024,
+      },
+    });
+
+    if (!response.text) {
+      throw new Error("Empty AI response");
+    }
+
+    return response.text;
   },
 
   // === FALLBACK LOGIC ===
@@ -377,7 +464,6 @@ const buildSuggestedBudgetFromInput = (
 ): SuggestedBudget => {
   const travelers = input.travelers || 2;
   const pace = input.travelPace || "moderate";
-
   const perTravelerPerDay = {
     transport: 600,
     meals: 800,
@@ -408,7 +494,6 @@ const buildSuggestedBudgetFromInput = (
   const activities = perTravelerPerDay.activities * travelers * duration * itineraryFactor;
   const accommodation = perTravelerPerDay.accommodation * travelers * duration * itineraryFactor;
   const misc = perTravelerPerDay.misc * travelers * duration * itineraryFactor;
-
   const baseTotal = transport + meals + activities + accommodation + misc;
 
   let scaledTotal = baseTotal;
