@@ -14,6 +14,7 @@ export const AiController = {
       createResponse(res, HTTP_STATUS.OK, "Itinerary generated", {
         itinerary: result.itinerary,
         metadata: result.metadata,
+        suggestedBudget: result.suggestedBudget,
       });
     } catch (error) {
       if (error instanceof ZodError) {

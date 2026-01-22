@@ -47,6 +47,19 @@ interface ItineraryMetadata {
 interface GenerateItineraryResult {
   itinerary: DayOutput[];
   metadata: ItineraryMetadata;
+  suggestedBudget: SuggestedBudget;
+}
+
+interface SuggestedBudget {
+  total: number;
+  breakdown: {
+    transport: number;
+    meals: number;
+    activities: number;
+    accommodation: number;
+    misc: number;
+  };
+  note?: string;
 }
 
 // === GEMINI SCHEMA ===
@@ -155,9 +168,15 @@ export const AiService = {
 
     if (!apiKey) {
       console.warn("GEMINI_API_KEY missing. Using fallback template.");
+      const fallbackItinerary = this.buildFallbackItinerary(input, duration);
       return {
-        itinerary: this.buildFallbackItinerary(input, duration),
+        itinerary: fallbackItinerary,
         metadata,
+        suggestedBudget: buildSuggestedBudgetFromInput(
+          input,
+          duration,
+          fallbackItinerary
+        ),
       };
     }
 
@@ -244,13 +263,23 @@ Output must follow the provided JSON schema exactly.
         };
       });
 
-      return { itinerary, metadata };
+      return {
+        itinerary,
+        metadata,
+        suggestedBudget: buildSuggestedBudgetFromInput(input, duration, itinerary),
+      };
 
     } catch (error) {
       console.error("AI Generation Failed:", error);
+      const fallbackItinerary = this.buildFallbackItinerary(input, duration);
       return {
-        itinerary: this.buildFallbackItinerary(input, duration),
+        itinerary: fallbackItinerary,
         metadata,
+        suggestedBudget: buildSuggestedBudgetFromInput(
+          input,
+          duration,
+          fallbackItinerary
+        ),
       };
     }
   },
@@ -340,3 +369,91 @@ Output must follow the provided JSON schema exactly.
     });
   },
 };
+
+const buildSuggestedBudgetFromInput = (
+  input: ItineraryInput,
+  duration: number,
+  itinerary: DayOutput[]
+): SuggestedBudget => {
+  const travelers = input.travelers || 2;
+  const pace = input.travelPace || "moderate";
+
+  const perTravelerPerDay = {
+    transport: 600,
+    meals: 800,
+    activities: 900,
+    accommodation: 1200,
+    misc: 300,
+  };
+
+  const activityCount = itinerary.reduce(
+    (sum, day) => sum + (day.activities?.length || 0),
+    0
+  );
+  const avgActivitiesPerDay = duration > 0 ? activityCount / duration : 0;
+
+  const activityFactor = clamp(avgActivitiesPerDay / 4, 0.85, 1.4);
+  const paceFactor =
+    pace === "packed"
+      ? 1.15
+      : pace === "relaxed"
+        ? 0.92
+        : pace === "own_pace"
+          ? 0.97
+          : 1.0;
+  const itineraryFactor = activityFactor * paceFactor;
+
+  const transport = perTravelerPerDay.transport * travelers * duration * itineraryFactor;
+  const meals = perTravelerPerDay.meals * travelers * duration * itineraryFactor;
+  const activities = perTravelerPerDay.activities * travelers * duration * itineraryFactor;
+  const accommodation = perTravelerPerDay.accommodation * travelers * duration * itineraryFactor;
+  const misc = perTravelerPerDay.misc * travelers * duration * itineraryFactor;
+
+  const baseTotal = transport + meals + activities + accommodation + misc;
+
+  let scaledTotal = baseTotal;
+  if (typeof input.budget === "number" && input.budget > 0) {
+    const blended = baseTotal * 0.7 + input.budget * 0.3;
+    scaledTotal = clamp(blended, baseTotal * 0.85, baseTotal * 1.5);
+  }
+
+  const scale = baseTotal > 0 ? scaledTotal / baseTotal : 1;
+
+  const scaledTransport = transport * scale;
+  const scaledMeals = meals * scale;
+  const scaledActivities = activities * scale;
+  const scaledAccommodation = accommodation * scale;
+  const scaledMisc = misc * scale;
+
+  const total =
+    scaledTransport +
+    scaledMeals +
+    scaledActivities +
+    scaledAccommodation +
+    scaledMisc +
+    1000;
+
+  let note = `Suggested budget based on ${travelers} traveler(s), ${duration} day(s), pace, and activity volume, plus a ₱1,000 buffer.`;
+  if (typeof input.budget === "number" && input.budget > 0) {
+    if (input.budget < baseTotal) {
+      note += " Your input budget may be lower than typical costs.";
+    } else if (input.budget > baseTotal) {
+      note += " Your input budget was considered in the estimate.";
+    }
+  }
+
+  return {
+    total,
+    breakdown: {
+      transport: scaledTransport,
+      meals: scaledMeals,
+      activities: scaledActivities,
+      accommodation: scaledAccommodation,
+      misc: scaledMisc,
+    },
+    note,
+  };
+};
+
+const clamp = (value: number, min: number, max: number) =>
+  Math.min(Math.max(value, min), max);
