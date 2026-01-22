@@ -47,6 +47,19 @@ interface ItineraryMetadata {
 interface GenerateItineraryResult {
   itinerary: DayOutput[];
   metadata: ItineraryMetadata;
+  suggestedBudget: SuggestedBudget;
+}
+
+interface SuggestedBudget {
+  total: number;
+  breakdown: {
+    transport: number;
+    meals: number;
+    activities: number;
+    accommodation: number;
+    misc: number;
+  };
+  note?: string;
 }
 
 // === GEMINI SCHEMA ===
@@ -81,6 +94,25 @@ const itinerarySchema = {
         },
         required: ["day", "title", "activities"],
       },
+    },
+    suggestedBudget: {
+      type: "OBJECT",
+      properties: {
+        total: { type: "NUMBER" },
+        breakdown: {
+          type: "OBJECT",
+          properties: {
+            transport: { type: "NUMBER" },
+            meals: { type: "NUMBER" },
+            activities: { type: "NUMBER" },
+            accommodation: { type: "NUMBER" },
+            misc: { type: "NUMBER" },
+          },
+          required: ["transport", "meals", "activities", "accommodation", "misc"],
+        },
+        note: { type: "STRING" },
+      },
+      required: ["total", "breakdown"],
     },
   },
   required: ["days"],
@@ -198,6 +230,8 @@ ${budget ? `- Budget: ₱${budget.toLocaleString()}` : ""}
    - Ordered logically by time (morning to evening)
    - Appropriate for the travel pace
 
+6. Provide a top-level JSON field "suggestedBudget" with a realistic total and breakdown (transport, meals, activities, accommodation, misc). Compute totals using travelers × days × typical daily costs; if a user budget is provided, compare and suggest a realistic amount when needed.
+
 **Day Titles:** Short and catchy (e.g., "Island Hopping Adventure", "Cultural Heritage Walk")
 
 Output must follow the provided JSON schema exactly.
@@ -244,13 +278,25 @@ Output must follow the provided JSON schema exactly.
         };
       });
 
-      return { itinerary, metadata };
+      const suggestedBudget = buildSuggestedBudgetFromInput(
+        input,
+        duration,
+        itinerary
+      );
+
+      return { itinerary, metadata, suggestedBudget };
 
     } catch (error) {
       console.error("AI Generation Failed:", error);
+      const fallbackItinerary = this.buildFallbackItinerary(input, duration);
       return {
-        itinerary: this.buildFallbackItinerary(input, duration),
+        itinerary: fallbackItinerary,
         metadata,
+        suggestedBudget: buildSuggestedBudgetFromInput(
+          input,
+          duration,
+          fallbackItinerary
+        ),
       };
     }
   },
@@ -277,6 +323,7 @@ Provide concise, professional refinement suggestions to improve itineraries.
 Guidelines:
 - Focus on logistics, pricing alignment, and guest experience
 - Highlight potential issues or improvements
+    - Include an approximate budget summary when budget data is available (transport, meals, activities, accommodation, misc)
 - Keep 4-5 bullet points
 - Use markdown headings and bullets`
       : `You are a friendly AI travel assistant for Bond Voyage customers.
@@ -284,6 +331,7 @@ Provide helpful, easy-to-understand refinement suggestions.
 
 Guidelines:
 - Focus on experience, pacing, and value
+    - Include an approximate budget summary when budget data is available (transport, meals, activities, accommodation, misc)
 - Keep 3-4 bullet points
 - Encourage discussion with the travel agent
 - Use markdown headings and bullets`;
@@ -299,7 +347,8 @@ ${context.itinerary ? JSON.stringify(context.itinerary, null, 2) : "No itinerary
 ## Recent Chat Discussion
 ${context.chatHistory.length > 0 ? context.chatHistory.join("\n") : "No previous discussion."}
 
-Provide refinement suggestions based on this context.`;
+Provide refinement suggestions based on this context.
+If budget information is present, add a short approximate budget breakdown (transport, meals, activities, accommodation, misc).`;
 
     const response = await client.models.generateContent({
       model: process.env.GEMINI_MODEL || "gemini-2.5-flash-lite-preview-06-2025",
@@ -403,3 +452,76 @@ Provide refinement suggestions based on this context.`;
     });
   },
 };
+
+const buildSuggestedBudgetFromInput = (
+  input: ItineraryInput,
+  duration: number,
+  itinerary: DayOutput[]
+): SuggestedBudget => {
+  const travelers = input.travelers || 2;
+  const pace = input.travelPace || "moderate";
+  const perTravelerPerDay = {
+    transport: 600,
+    meals: 800,
+    activities: 900,
+    accommodation: 1200,
+    misc: 300,
+  };
+
+  const activityCount = itinerary.reduce(
+    (sum, day) => sum + (day.activities?.length || 0),
+    0
+  );
+  const avgActivitiesPerDay = duration > 0 ? activityCount / duration : 0;
+
+  const activityFactor = clamp(avgActivitiesPerDay / 4, 0.85, 1.4);
+  const paceFactor = pace === "packed" ? 1.15 : pace === "relaxed" ? 0.92 : pace === "own_pace" ? 0.97 : 1.0;
+  const itineraryFactor = activityFactor * paceFactor;
+
+  const transport = perTravelerPerDay.transport * travelers * duration * itineraryFactor;
+  const meals = perTravelerPerDay.meals * travelers * duration * itineraryFactor;
+  const activities = perTravelerPerDay.activities * travelers * duration * itineraryFactor;
+  const accommodation = perTravelerPerDay.accommodation * travelers * duration * itineraryFactor;
+  const misc = perTravelerPerDay.misc * travelers * duration * itineraryFactor;
+  const baseTotal = transport + meals + activities + accommodation + misc;
+
+  let scaledTotal = baseTotal;
+  if (typeof input.budget === "number" && input.budget > 0) {
+    const blended = baseTotal * 0.7 + input.budget * 0.3;
+    scaledTotal = clamp(blended, baseTotal * 0.85, baseTotal * 1.5);
+  }
+
+  const scale = baseTotal > 0 ? scaledTotal / baseTotal : 1;
+
+  const scaledTransport = transport * scale;
+  const scaledMeals = meals * scale;
+  const scaledActivities = activities * scale;
+  const scaledAccommodation = accommodation * scale;
+  const scaledMisc = misc * scale;
+
+  const total = scaledTransport + scaledMeals + scaledActivities + scaledAccommodation + scaledMisc + 1000;
+
+  let note = `Suggested budget based on ${travelers} traveler(s), ${duration} day(s), pace, and activity volume, plus a ₱1,000 buffer.`;
+  if (typeof input.budget === "number" && input.budget > 0) {
+    if (input.budget < baseTotal) {
+      note += " Your input budget may be lower than typical costs.";
+    } else if (input.budget > baseTotal) {
+      note += " Your input budget was considered in the estimate.";
+    }
+  }
+
+  return {
+    total,
+    breakdown: {
+      transport: scaledTransport,
+      meals: scaledMeals,
+      activities: scaledActivities,
+      accommodation: scaledAccommodation,
+      misc: scaledMisc,
+    },
+    note,
+  };
+};
+
+const clamp = (value: number, min: number, max: number) =>
+  Math.min(Math.max(value, min), max);

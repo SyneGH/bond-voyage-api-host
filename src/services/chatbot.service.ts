@@ -218,6 +218,9 @@ Be warm and enthusiastic. Use phrases like "I've curated a special route!", "Thi
 - Pace: ${pace}
 - Preferences: ${userPrefs.length > 0 ? userPrefs.join(", ") : "General sightseeing"}
 
+### Budget Guidance
+If a budget is provided, include a concise approximate breakdown (transport, meals, activities, accommodation, misc) inside the message field, and ensure activity choices are aligned with the budget. Keep it high-level and realistic.
+
 ### Output Rules By Mode
 ${roamanMode === "ADD_TO_DAY" ? `
 - Return draft.days as an array with EXACTLY ONE object.
