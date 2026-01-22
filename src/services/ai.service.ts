@@ -190,6 +190,11 @@ export const AiService = {
       return {
         itinerary: this.buildFallbackItinerary(input, duration),
         metadata,
+        suggestedBudget: buildSuggestedBudgetFromInput(
+          input,
+          duration,
+          this.buildFallbackItinerary(input, duration)
+        ),
       };
     }
 
