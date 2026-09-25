@@ -1,7 +1,14 @@
-# Node.js Prisma Authentication Boilerplate
+# BondVoyage — Backend API
 
-A robust Node.js authentication boilerplate with TypeScript, Prisma ORM, PostgreSQL, Redis caching, and JWT authentication.
-AI agents: always read `AGENTS.md` first.
+**AI-Powered Collaborative Travel Planning System with Route Mapping and Admin-Approved Itinerary Booking** — college capstone project.
+
+Backend service for BondVoyage: a TypeScript/Express API (Prisma ORM, PostgreSQL, Redis) handling authentication, itinerary and booking management, AI-generated itineraries, route mapping, and two AI chat features (Roaman and Roameo).
+
+Frontend repo, built by my capstone teammate [virginiarosed](https://github.com/virginiarosed): https://github.com/virginiarosed/bond-voyage
+
+**My role:** backend, database, and hosting/DevOps for both the frontend and backend deployments — authentication (JWT + OTP), the AI itinerary and chatbot guardrails, map-routing logic, and the API layer connecting this backend to the frontend.
+
+**Status:** Archived — completed as a capstone requirement; not in active development.
 
 ## 🚀 Features
 
@@ -431,35 +438,3 @@ docker build -t nodejs-auth-api .
 # Run with production environment
 docker run -p 3000:3000 --env-file .env.production nodejs-auth-api
 ```
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-## 📄 License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## 🆘 Support
-
-For support and questions:
-
-- Create an issue in the repository
-- Check the documentation
-- Review the code examples
-
-## 🔄 Migration from MongoDB
-
-This boilerplate provides equivalent functionality to your MongoDB implementation with the following key differences:
-
-1. **Prisma ORM** instead of Mongoose
-2. **PostgreSQL** instead of MongoDB
-3. **Structured relational data** instead of document-based
-4. **Type-safe database queries** with Prisma Client
-5. **Better performance** with SQL optimizations and Redis caching
-
-The API endpoints and authentication flow remain the same, making migration seamless.
