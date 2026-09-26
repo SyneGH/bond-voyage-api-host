@@ -10,6 +10,19 @@ Frontend repo, built by my capstone teammate [virginiarosed](https://github.com/
 
 **Status:** Archived — completed as a capstone requirement; not in active development.
 
+**Capstone manuscript:** [Full project documentation](https://docs.google.com/document/d/1ePny4lD5sfY45AD0Wz3XfMZshMnnAYGC/edit)
+
+## 🏛️ Architecture
+
+Decoupled frontend/backend:
+
+```
+Frontend (Vercel) → Backend API (Render, TypeScript/Express) → Prisma ORM → PostgreSQL (Supabase)
+                                                               → Redis (Upstash, OTP cache)
+```
+
+Maps are handled via Geoapify (routing/geocoding logic) and Leaflet (map UI) for tiling, markers, place search, routing, route matrices, and address autocomplete. The two AI chat features (Roaman, an itinerary-maker assistant, and Roameo, an FAQ chatbot) run on Google Gemini behind guardrails: prompt restrictions, output validation, itinerary/destination restrictions (only locations reachable by the selected travel mode), and structured JSON output for other modules to consume.
+
 ## 🚀 Features
 
 - **Authentication & Authorization**
@@ -438,3 +451,33 @@ docker build -t nodejs-auth-api .
 # Run with production environment
 docker run -p 3000:3000 --env-file .env.production nodejs-auth-api
 ```
+
+## 🤖 Development Approach
+
+Built in close collaboration with AI tools (Claude, Gemini, ChatGPT, GitHub Copilot), including agentic coding workflows for implementation, debugging, and iteration. Architecture decisions, API design, database schema, DevOps/deployment, and the integration work connecting this backend to the frontend were mine — AI collaboration was a core part of how I worked through the harder problems below, especially given this was my first time building something at this scale.
+
+## 🧩 Notable Problems Solved
+
+- **Designing the itinerary process flow.** BondVoyage supports four itinerary types (Standard, Requested, Customized, and AI-generated Smart Trip), each with a different creation flow. Translating that concept into working code took several iterations to get right.
+- **Managing complexity as the codebase grew.** What started as a small project grew into a business-flow-heavy system. I moved from manually tracking changes to relying on frameworks and tooling to keep the codebase organized as it scaled.
+- **Connecting the backend to the frontend.** With limited prior full-stack experience, wiring this API to the frontend was one of the harder parts of the project — worked through it via documentation, tutorials, and iterative debugging.
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## 📄 License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## 🆘 Support
+
+For support and questions:
+
+- Create an issue in the repository
+- Check the documentation
+- Review the code examples
